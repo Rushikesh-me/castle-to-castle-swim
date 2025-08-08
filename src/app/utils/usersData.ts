@@ -1,4 +1,4 @@
-import type { SwimmerTrack, DrawTrack } from "@/app/types";
+import type { SwimmerTrack, DrawTrack, SwimmerUser } from "@/app/types";
 
 /**
  * Enhanced function to extract and validate swim tracks from raw swimmer data
@@ -140,7 +140,8 @@ export function calculateOptimalView(tracks: DrawTrack[]): {
 /**
  * Validate swimmer data structure
  */
-export function validateSwimmerData(swimmers: any[]): {
+
+export function validateSwimmerData(swimmers: Partial<SwimmerTrack>[]): {
 	isValid: boolean;
 	errors: string[];
 	warnings: string[];

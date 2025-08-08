@@ -30,8 +30,7 @@ export async function POST(request: NextRequest) {
 		await createUser(userData as SwimmerUser);
 
 		return NextResponse.json({ message: "Account created successfully" }, { status: 201 });
-	} catch (error: any) {
-		console.error("Error in signup route:", error);
-		return NextResponse.json({ error: error.message || "Failed to create account" }, { status: 400 });
+	} catch (error) {
+		return NextResponse.json({ error: JSON.stringify(error) || "Failed to create account" }, { status: 400 });
 	}
 }

@@ -268,7 +268,7 @@ export default function Dashboard() {
 						</CardHeader>
 						<CardContent className="p-6">
 							{!session.user.is_admin ? (
-								<form onSubmit={handleSubmit(handleProfileUpdate as any)} className="space-y-6">
+								<form onSubmit={handleSubmit(handleProfileUpdate)} className="space-y-6">
 									<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 										<div>
 											<label className="block text-sm font-semibold mb-2 text-gray-700">Email</label>

@@ -2,11 +2,10 @@
 
 import { APIProvider, Map, AdvancedMarker, useMap } from "@vis.gl/react-google-maps";
 import { Fragment, useEffect, useMemo, useRef, useState, useCallback } from "react";
-import { extractTracks, calculateOptimalView } from "@/app/utils/usersData";
 import { Polyline } from "@/app/components/map/Polyline";
-import { Card, CardContent, CardHeader, CardTitle } from "@/app/components/ui/card";
+import { Card} from "@/app/components/ui/card";
 import { Button } from "@/app/components/ui/button";
-import type { SwimmerTrack, DrawTrack, LocationPoint } from "@/app/types";
+import type { DrawTrack, LocationPoint } from "@/app/types";
 import { 
 	ChevronLeft, 
 	ChevronRight, 
@@ -14,15 +13,8 @@ import {
 	Loader2, 
 	Users, 
 	User,
-	Clock,
-	MapPin,
-	Activity,
-	Battery,
-	Signal
 } from "lucide-react";
 import { useSwimmers } from "@/app/utils/providers/SwimmerProvider";
-
-type SwimCategory = "solo" | "relay";
 
 interface SwimmerStats {
 	totalDistance: number;
@@ -32,21 +24,8 @@ interface SwimmerStats {
 }
 
 export default function EnhancedSwimTracker() {
-	const {
-		swimmers,
-		tracks,
-		isLoading,
-		error,
-		selectedCategory,
-		setSelectedCategory,
-		fetchSwimmers,
-		swimmerHistory,
-		fetchSwimmerHistory,
-		loadingHistory,
-		page,
-		setPage,
-		hasMore,
-	} = useSwimmers();
+	//@ts-nocheck
+	const { swimmers, tracks, isLoading, error, selectedCategory, setSelectedCategory, fetchSwimmers, swimmerHistory, fetchSwimmerHistory, loadingHistory, page, setPage, hasMore} = useSwimmers();
 	const [selectedSwimmer, setSelectedSwimmer] = useState<DrawTrack | null>(null);
 	const [showBottomSheet, setShowBottomSheet] = useState(false);
 	const [currentSwimmerIndex, setCurrentSwimmerIndex] = useState(0);
@@ -131,6 +110,7 @@ export default function EnhancedSwimTracker() {
 		const history = await fetchSwimmerHistory(track.id);
 		
 		// Note: Map bounds will be updated in the MapContent component
+		//@ts-nocheck
 	}, [availableSwimmers, fetchSwimmerHistory]);
 
 	// Navigate between swimmers

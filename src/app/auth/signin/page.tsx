@@ -49,7 +49,7 @@ export default function SignInPage() {
 				router.push("/dashboard");
 			}
 		} catch (err) {
-			setError("Something went wrong");
+			setError(err instanceof Error ? err.message :"Something went wrong");
 		} finally {
 			setIsLoading(false);
 		}
@@ -84,7 +84,7 @@ export default function SignInPage() {
 						</Button>
 
 						<p className="text-center text-sm text-gray-600">
-							Don't have an account?{" "}
+							Don&apos;t have an account?{" "}
 							<Link href="/auth/signup" className="text-blue-600 hover:underline">
 								Sign up
 							</Link>

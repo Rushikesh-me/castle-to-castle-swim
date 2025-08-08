@@ -1,4 +1,4 @@
- 
+
 import { forwardRef, useContext, useEffect, useImperativeHandle, useMemo, useRef } from "react";
 
 import { GoogleMapsContext, useMapsLibrary } from "@vis.gl/react-google-maps";
@@ -103,10 +103,10 @@ function usePolyline(props: PolylineProps) {
 /**
  * Component to render a polyline on a map
  */
+
 export const Polyline = forwardRef((props: PolylineProps, ref: PolylineRef) => {
 	const polyline = usePolyline(props);
-
 	useImperativeHandle(ref, () => polyline, []);
-
 	return null;
 });
+Polyline.displayName = "Polyline"

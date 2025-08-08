@@ -11,10 +11,10 @@ interface TestResult {
 	endpoint: string;
 	status: "success" | "error";
 	message: string;
-	data?: any;
+	data?: string | object;
 }
 
-export async function GET(request: NextRequest) {
+export async function GET() {
 	const session = await auth();
 	
 	if (!session?.user?.is_admin) {
@@ -99,7 +99,7 @@ export async function GET(request: NextRequest) {
 
 	// Test 5: Test validation for invalid swim type
 	try {
-		await getActiveSwimmersWithLocations("invalid" as any, 10);
+		await getActiveSwimmersWithLocations("invalid", 10);
 		results.push({
 			endpoint: "getActiveSwimmersWithLocations (validation)",
 			status: "error",
@@ -110,6 +110,7 @@ export async function GET(request: NextRequest) {
 			endpoint: "getActiveSwimmersWithLocations (validation)",
 			status: "success",
 			message: "Validation correctly rejected invalid swim type",
+			data: JSON.stringify(error)
 		});
 	}
 

@@ -8,13 +8,7 @@ export async function GET(
 	{ params }: { params: Promise<{ username: string }> }
 ) {
 	try {
-		const session = await auth();
 		const { username } = await params;
-
-
-		// Allow users to access their own history or admins to access any history
-		
-
 		const history = await getSwimmerCompleteHistory(username);
 		return NextResponse.json(history);
 	} catch (error) {

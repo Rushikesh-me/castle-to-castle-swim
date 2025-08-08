@@ -88,7 +88,7 @@ export async function updateSwimmerProfile(
 	}
 ) {
 	const updateExpressions = [];
-	const expressionAttributeValues: any = {
+	const expressionAttributeValues : Record<string, string | null | number | boolean> = {
 		":updated": new Date().toISOString(),
 	};
 
@@ -138,7 +138,7 @@ export async function getActiveSwimmersWithLocations(swimType?: string, location
 		? `${baseFilterExpression} AND swim_type = :swim_type`
 		: baseFilterExpression;
 	
-	const expressionAttributeValues: any = {
+	const expressionAttributeValues: Record<string, string | null | number | boolean> = {
 		":pk": "USER",
 		":active": true,
 	};

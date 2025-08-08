@@ -5,14 +5,11 @@ import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { SignUpSchema } from "@/app/utils/validation";
-import { createUser } from "@/app/utils/db/helpers";
 import { Button } from "@/app/components/ui/button";
 import { Input } from "@/app/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/app/components/ui/card";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { get } from "http";
-import { stat } from "fs";
 
 type SignUpFormData = {
 	username: string;
@@ -64,17 +61,15 @@ export default function SignUpPage() {
 				const errorData = await response.json();
 				setError(errorData.error || "Failed to create account");
 			}
-		} catch (err: any) {
+		} catch (err) {
 			console.error("Error creating account:", err);
-			setError(err.message || "Something went wrong");
+			setError(err instanceof Error ? err.message : "Something went wrong");
 			return;
 		} finally {
 			setIsLoading(false);
 		}
 		
     };
-    
-    useEffect(() => { console.log("swim type", watch("swim_type")) }, [watch("swim_type")]);
 
 	return (
 		<div className="flex min-h-screen items-center justify-center bg-gray-50">

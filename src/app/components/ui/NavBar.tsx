@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Dialog, DialogPanel, Popover, PopoverButton, PopoverGroup, PopoverPanel } from "@headlessui/react";
 import { ArrowPathIcon, Bars3Icon, ChartPieIcon, CursorArrowRaysIcon, FingerPrintIcon, SquaresPlusIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import { ChevronDownIcon, PhoneIcon, PlayCircleIcon } from "@heroicons/react/20/solid";
+import Link from "next/link";
 
 const products = [
 	{ name: "Analytics", description: "Get a better understanding of your traffic", href: "#", icon: ChartPieIcon },
@@ -34,10 +35,10 @@ const NavBar = () => {
 		<header className="bg-white z-[99] w-full fixed top-0">
 			<nav aria-label="Global" className="mx-auto flex max-w-7xl items-center justify-between px-6 py-2 lg:px-8">
 				<div className="flex lg:flex-1">
-					<a href="/" className="-m-1.5 p-1.5">
+					<Link href="/" className="-m-1.5 p-1.5">
 						<span className="sr-only">CastleSwim</span>
 						<img alt="CastleSwim Logo" src="https://images.leadconnectorhq.com/image/f_webp/q_80/r_1200/u_https://assets.cdn.filesafe.space/X1LQYi2rEkolCwaxzST4/media/644eaaf7208b4e2264148088.png" className="h-16 w-auto" />
-					</a>
+					</Link>
 				</div>
 				<div className="flex lg:hidden">
 					<button type="button" onClick={() => setMobileMenuOpen(true)} className="-m-2.5 inline-flex items-center justify-center rounded-md p-2.5 text-gray-700">
@@ -46,19 +47,19 @@ const NavBar = () => {
 					</button>
 				</div>
 				<PopoverGroup className="hidden lg:flex lg:gap-x-12">
-					<a href="/" className="text-sm font-semibold leading-6 text-gray-900">
+					<Link href="/" className="text-sm font-semibold leading-6 text-gray-900">
 						Map
-					</a>
+					</Link>
 
-					<a href="/leaderboards" className="text-sm font-semibold leading-6 text-gray-900">
+					<Link href="/leaderboards" className="text-sm font-semibold leading-6 text-gray-900">
 						Leaderboards
-					</a>
+					</Link>
 					
 				</PopoverGroup>
 				<div className="hidden lg:flex lg:flex-1 lg:justify-end">
-					<a href="/auth/signin" className="text-sm font-semibold leading-6 text-gray-900">
+					<Link href="/auth/signin" className="text-sm font-semibold leading-6 text-gray-900">
 						Swimmers Dashboard <span aria-hidden="true">&rarr;</span>
-					</a>
+					</Link>
 				</div>
 			</nav>
 			<Dialog open={mobileMenuOpen} onClose={setMobileMenuOpen} className="lg:hidden">
@@ -66,10 +67,10 @@ const NavBar = () => {
 				<DialogPanel className="fixed inset-y-0 right-0 z-10 flex w-full flex-col justify-between overflow-y-auto bg-white sm:max-w-sm sm:ring-1 sm:ring-gray-900/10">
 					<div className="p-6">
 						<div className="flex items-center justify-between">
-							<a href="/map" className="-m-1.5 p-1.5">
+							<Link href="/map" className="-m-1.5 p-1.5">
 								<span className="sr-only">CastleSwim</span>
 								<img alt="CastleSwim Logo" src="/vercel.svg" className="h-8 w-auto" />
-							</a>
+							</Link>
 							<button type="button" onClick={() => setMobileMenuOpen(false)} className="-m-2.5 rounded-md p-2.5 text-gray-700">
 								<span className="sr-only">Close menu</span>
 								<XMarkIcon aria-hidden="true" className="h-6 w-6" />
@@ -78,20 +79,20 @@ const NavBar = () => {
 						<div className="mt-6 flow-root">
 							<div className="-my-6 divide-y divide-gray-500/10">
 								<div className="space-y-2 py-6">
-									<a href="/" className="block rounded-lg px-3 py-2 text-base font-semibold leading-7 text-gray-900 hover:bg-gray-50">Map</a>
-									<a href="/leaderboards" className="block rounded-lg px-3 py-2 text-base font-semibold leading-7 text-gray-900 hover:bg-gray-50">Leaderboards</a>
+									<Link href="/" className="block rounded-lg px-3 py-2 text-base font-semibold leading-7 text-gray-900 hover:bg-gray-50">Map</Link>
+									<Link href="/leaderboards" className="block rounded-lg px-3 py-2 text-base font-semibold leading-7 text-gray-900 hover:bg-gray-50">Leaderboards</Link>
 								</div>
 								<div className="py-6">
-									<a href="/auth/signin" className="block rounded-lg px-3 py-2.5 text-base font-semibold leading-7 text-gray-900 hover:bg-gray-50">Swimmers</a>
+									<Link href="/auth/signin" className="block rounded-lg px-3 py-2.5 text-base font-semibold leading-7 text-gray-900 hover:bg-gray-50">Swimmers</Link>
 								</div>
 							</div>
 						</div>
 					</div>
 					<div className="sticky bottom-0 grid grid-cols-2 divide-x divide-gray-900/5 bg-gray-50 text-center">
 						{callsToAction.map((item) => (
-							<a key={item.name} href={item.href} className="p-3 text-base font-semibold leading-7 text-gray-900 hover:bg-gray-100">
+							<Link key={item.name} href={item.href} className="p-3 text-base font-semibold leading-7 text-gray-900 hover:bg-gray-100">
 								{item.name}
-							</a>
+							</Link>
 						))}
 					</div>
 				</DialogPanel>
