@@ -1,23 +1,60 @@
 @import "tailwindcss";
+@theme {
+  /* Primary brand colors */
+  --color-primary: #0D78AA; /* Castle Blue - main brand color for buttons, links */
+  --color-primary-foreground: #FFFFFF; /* White text on primary elements */
+  --color-secondary: #02BAD6; /* Pieta Teal for secondary actions */
+  --color-secondary-foreground: #FFFFFF; /* White text on secondary elements */
+  --color-accent: #FFD700; /* Memorial Gold for highlights and achievements */
+  --color-accent-foreground: #1E3A8A; /* Deep Navy text on gold background */
+
+  /* Card and surface colors */
+  --color-card: #C9FAFE; /* Water Light for cards and surfaces */
+  --color-card-foreground: #1E3A8A; /* Deep Navy for card text */
+  --color-popover: #C9FAFE; /* Water Light for popovers */
+  --color-popover-foreground: #1E3A8A; /* Deep Navy for popover text */
+
+  /* Background and text */
+  --color-background: #FFFFFF; /* Clean White for main background */
+  --color-foreground: #1E3A8A; /* Deep Navy for body text */
+
+  /* Interactive elements */
+  --color-border: #8B8680; /* Castle Stone for borders */
+  --color-input: #C9FAFE; /* Water Light for input fields */
+  --color-ring: #0D78AA; /* Castle Blue for focus rings */
+
+  /* Status and alert colors */
+  --color-success: #4CAF50; /* Irish Green for success states */
+  --color-success-foreground: #FFFFFF; /* White text on success */
+  --color-warning: #FDE047; /* Sunrise Yellow for warnings */
+  --color-warning-foreground: #1E3A8A; /* Deep Navy text on warning */
+  --color-destructive: #EF4444; /* Warning Red for errors/alerts */
+  --color-destructive-foreground: #FFFFFF; /* White text on destructive */
+  --color-safety: #FF6B35; /* Safety Orange for critical alerts */
+  --color-safety-foreground: #FFFFFF; /* White text on safety alerts */
+
+  /* Typography */
+  --font-display: "Inter", system-ui, sans-serif; /* Clean, modern font for headings */
+  --font-body: "Inter", system-ui, sans-serif; /* Consistent font for body text */
+
+  /* Muted variations */
+  --color-muted: #8B8680; /* Castle Stone for muted elements */
+  --color-muted-foreground: #FFFFFF; /* White text on muted background */
+}
 
 :root {
   --background: #ffffff;
-  --foreground: #171717;
+  --foreground: #1E3A8A;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
+/* Dark mode variant (optional) */
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: #1E3A8A;
+    --foreground: #ffffff;
   }
 }
+
 
 body {
   background: var(--background);

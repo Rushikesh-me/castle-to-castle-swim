@@ -93,7 +93,7 @@ function MapPageContent() {
 			</header> */}
 
 			{/* Map Container */}
-			<div className="h-[calc(100vh)]">
+			<div className="h-[calc(100vh-4rem)]">
 				<ErrorBoundary>
 					<EnhancedSwimTracker />
 				</ErrorBoundary>
