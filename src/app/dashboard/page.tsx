@@ -193,7 +193,7 @@ export default function Dashboard() {
 	}
 
 	return (
-		<div className="min-h-screen bg-gradient-to-br from-blue-50 via-cyan-50 to-blue-100">
+		<div className="min-h-screen pt-20 bg-gradient-to-br from-blue-50 via-cyan-50 to-blue-100">
 			{/* Header */}
 			<header className="bg-white/80 backdrop-blur-sm shadow-lg border-b border-blue-200 sticky top-0 z-50">
 				<div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
