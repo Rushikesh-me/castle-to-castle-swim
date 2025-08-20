@@ -86,6 +86,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 						avatar: user.avatar || "",
 						idonate_url: (user as Partial<SwimmerUser>).idonate_url || "",
 						bio: (user as Partial<SwimmerUser>).bio || "",
+						first_name: (user as Partial<SwimmerUser>).first_name || "",
+						last_name: (user as Partial<SwimmerUser>).last_name || "",
+						location: (user as Partial<SwimmerUser>).location || "",
 					};
 				} catch (error) {
 			
@@ -104,6 +107,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 				token.avatar = user.avatar;
 				token.idonate_url = (user as Partial<SwimmerUser>).idonate_url || "";
 				token.bio = (user as Partial<SwimmerUser>).bio || "";
+				token.first_name = (user as Partial<SwimmerUser>).first_name || "";
+				token.last_name = (user as Partial<SwimmerUser>).last_name || "";
+				token.location = (user as Partial<SwimmerUser>).location || "";
 			}
 			
 			// Handle session updates
@@ -130,6 +136,15 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 				if ((session as Partial<SwimmerUser>).bio !== undefined) {
 					token.bio = (session as Partial<SwimmerUser>).bio as string;
 				}
+				if ((session as Partial<SwimmerUser>).first_name !== undefined) {
+					token.first_name = (session as Partial<SwimmerUser>).first_name as string;
+				}
+				if ((session as Partial<SwimmerUser>).last_name !== undefined) {
+					token.last_name = (session as Partial<SwimmerUser>).last_name as string;
+				}
+				if ((session as Partial<SwimmerUser>).location !== undefined) {
+					token.location = (session as Partial<SwimmerUser>).location as string;
+				}
 			}
 			
 			return token;
@@ -143,6 +158,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 			session.user.avatar = token.avatar as string;
 			(session.user as Partial<SwimmerUser>).idonate_url = (token as Partial<SwimmerUser>).idonate_url as string;
 			(session.user as Partial<SwimmerUser>).bio = (token as Partial<SwimmerUser>).bio as string;
+			(session.user as Partial<SwimmerUser>).first_name = (token as Partial<SwimmerUser>).first_name as string;
+			(session.user as Partial<SwimmerUser>).last_name = (token as Partial<SwimmerUser>).last_name as string;
+			(session.user as Partial<SwimmerUser>).location = (token as Partial<SwimmerUser>).location as string;
 			return session;
 		},
 	},

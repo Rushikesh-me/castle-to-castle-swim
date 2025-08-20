@@ -1,4 +1,4 @@
-import { GetCommand, PutCommand, QueryCommand, ScanCommand, UpdateCommand, BatchGetCommand, QueryCommandOutput } from "@aws-sdk/lib-dynamodb";
+import { GetCommand, PutCommand, QueryCommand, ScanCommand, UpdateCommand, BatchGetCommand, QueryCommandOutput, UpdateCommandInput } from "@aws-sdk/lib-dynamodb";
 import ddb from "./ddb";
 import { createHmac } from "crypto";
 import { SwimmerTrack, SwimmerUser } from "@/app/types";
@@ -346,6 +346,7 @@ export async function updateSwimmerProfile(
 	swimTypeHint?: "solo" | "relay"
 ) {
 	const updateExpressions: string[] = [];
+	const expressionAttributeNames: Record<string, string> = {};
 	const expressionAttributeValues : Record<string, string | null | number | boolean> = {
 		":updated": getCurrentEpochString(),
 	};
@@ -383,8 +384,10 @@ export async function updateSwimmerProfile(
 		expressionAttributeValues[":last_name"] = updates.last_name;
 	}
 	if (updates.location) {
-		updateExpressions.push("location = :location");
-		expressionAttributeValues[":location"] = updates.location;
+		updateExpressions.push("#user_location = :user_location");
+		expressionAttributeNames["#user_location"] = "location";
+		expressionAttributeValues[":user_location"] = updates.location;
+
 	}
 	if (updates.start_time) {
 		updateExpressions.push("start_time = :start_time");
@@ -398,14 +401,19 @@ export async function updateSwimmerProfile(
 	if (updateExpressions.length === 0) return;
 
 	const tryUpdate = async (pk: "USER" | "TEAM") => {
-		await ddb.send(new UpdateCommand({
+		const command : UpdateCommandInput = {
 			TableName: process.env.USERS_TABLE_NAME!,
 			Key: { pk, sk: username },
 			UpdateExpression: `SET ${updateExpressions.join(", ")}, updated_at = :updated`,
 			ConditionExpression: "attribute_exists(pk)",
-			ExpressionAttributeValues: expressionAttributeValues,
-		}));
+			ExpressionAttributeValues: expressionAttributeValues,	
+		}
+		if (Object.keys(expressionAttributeNames).length > 0) {
+			command.ExpressionAttributeNames = expressionAttributeNames;
+		}
+		await ddb.send(new UpdateCommand(command));
 	};
+	
 
 	if (swimTypeHint === "solo") {
 		await tryUpdate("USER");

@@ -13,7 +13,6 @@ import { formatEpochString } from "@/app/utils/timeUtils";
 import { SwimmerUser } from "../types";
 
 type UpdateProfileData = {
-	email: string;
 	team_name: string;
 	swim_type: "solo" | "relay";
 	avatar?: string;
@@ -22,8 +21,6 @@ type UpdateProfileData = {
 	first_name?: string;
 	last_name?: string;
 	location?: string;
-	start_time?: string;
-	finish_time?: string;
 };
 
 type Swimmer = {
@@ -88,7 +85,7 @@ export default function Dashboard() {
 
 	useEffect(() => {
 		if (session?.user) {
-			setValue("email", session.user.email || "");
+
 			setValue("team_name", session.user.team_name || "");
 			setValue("swim_type", (session.user.swim_type as "solo" | "relay") || "solo");
 			setValue("avatar", session.user.avatar || "");
@@ -97,8 +94,7 @@ export default function Dashboard() {
 			setValue("first_name", (session.user as unknown as { first_name?: string })?.first_name || "");
 			setValue("last_name", (session.user as unknown as { last_name?: string })?.last_name || "");
 			setValue("location", (session.user as unknown as { location?: string })?.location || "");
-			setValue("start_time", session.user.start_time ? new Date(parseInt(session.user.start_time) * 1000).toISOString().slice(0, 16) : "");
-			setValue("finish_time", session.user.finish_time ? new Date(parseInt(session.user.finish_time) * 1000).toISOString().slice(0, 16) : "");
+
 		}
 		if (session?.user?.is_admin) {
 			fetchSwimmers();
@@ -163,7 +159,6 @@ export default function Dashboard() {
 				method: "PUT",
 				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify({
-					email: data.email,
 					team_name: data.team_name,
 					swim_type: data.swim_type,
 					avatar: data.avatar,
@@ -172,16 +167,17 @@ export default function Dashboard() {
 					first_name: data.first_name,
 					last_name: data.last_name,
 					location: data.location,
-					start_time: data.start_time,
-					finish_time: data.finish_time,
 				}),
 			});
 
 			if (response.ok) {
 				const result = await response.json();
 				showMessage("Profile updated successfully!", "success");
-				// Update the session to reflect changes
-				await update();
+				// Update the session with the updated user data
+				await update({
+					...session?.user,
+					...result.user,
+				});
 			} else {
 				const error = await response.json();
 				showMessage(error.error || "Failed to update profile", "error");
@@ -381,15 +377,16 @@ export default function Dashboard() {
 						<CardContent className="p-6">
 							{!session.user.is_admin ? (
 								<form onSubmit={handleSubmit(handleProfileUpdate)} className="space-y-6">
-									{/* Email */}
+									{/* Email - Read Only */}
 									<div>
 										<label className="block text-sm font-semibold mb-2 text-gray-700">Email</label>
 										<input
 											type="email"
-											{...register("email", { required: "Email is required" })}
-											className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+											value={session.user.email || ""}
+											disabled
+											className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100 text-gray-600 cursor-not-allowed"
 										/>
-										{errors.email && <p className="text-red-500 text-sm mt-1">{errors.email.message}</p>}
+										<p className="text-xs text-gray-500 mt-1">Email cannot be changed. Contact admin if needed.</p>
 									</div>
 
 									{/* First Name and Last Name for Solo Swimmers */}
@@ -473,25 +470,27 @@ export default function Dashboard() {
 										/>
 									</div>
 
-									{/* Start Time and Finish Time */}
+									{/* Race Times - Read Only (Admin Only) */}
 									<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 										<div>
 											<label className="block text-sm font-semibold mb-2 text-gray-700">Start Time</label>
 											<input
-												type="datetime-local"
-												{...register("start_time")}
-												className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+												type="text"
+												value={session.user.start_time ? new Date(parseInt(session.user.start_time) * 1000).toLocaleString() : "Not set"}
+												disabled
+												className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100 text-gray-600 cursor-not-allowed"
 											/>
-											<p className="text-xs text-gray-500 mt-1">When your race will start</p>
+											<p className="text-xs text-gray-500 mt-1">Race start time (admin only)</p>
 										</div>
 										<div>
 											<label className="block text-sm font-semibold mb-2 text-gray-700">Finish Time</label>
 											<input
-												type="datetime-local"
-												{...register("finish_time")}
-												className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+												type="text"
+												value={session.user.finish_time ? new Date(parseInt(session.user.finish_time) * 1000).toLocaleString() : "Not set"}
+												disabled
+												className="w-full px-2 py-2 border border-gray-300 rounded-md bg-gray-100 text-gray-600 cursor-not-allowed"
 											/>
-											<p className="text-xs text-gray-500 mt-1">When you expect to finish (optional)</p>
+											<p className="text-xs text-gray-500 mt-1">Race finish time (admin only)</p>
 										</div>
 									</div>
 
