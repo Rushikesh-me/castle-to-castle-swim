@@ -80,10 +80,10 @@ function usePolyline(props: PolylineProps) {
 				point && 
 				typeof point.lat === 'number' && 
 				typeof point.lng === 'number' &&
-				isFinite(point.lat) && 
-				isFinite(point.lng) &&
-				point.lat >= -90 && point.lat <= 90 &&
-				point.lng >= -180 && point.lng <= 180
+				isFinite(point.lat()) && 
+				isFinite(point.lng()) &&
+				point.lat() >= -90 && point.lat() <= 90 &&
+				point.lng() >= -180 && point.lng() <= 180
 			);
 			
 
