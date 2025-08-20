@@ -132,26 +132,8 @@ function LeaderboardsContent() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="h-full mt-20 bg-gray-50">
       {/* Header */}
-      <header className="bg-white shadow-sm border-b sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center space-x-4">
-              <Link href="/dashboard">
-                <Button variant="ghost" size="sm" className="text-gray-600 hover:text-gray-900">
-                  <ArrowLeft className="w-4 h-4 mr-2" />
-                  Back to Dashboard
-                </Button>
-              </Link>
-              <div>
-                <h1 className="text-xl font-bold text-gray-900">Leaderboards</h1>
-                <p className="text-sm text-gray-500">Track swimmer progress and donations</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </header>
 
       {/* Category Tabs */}
       <div className="bg-white border-b">
