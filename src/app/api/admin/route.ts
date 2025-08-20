@@ -18,19 +18,19 @@ export async function PUT(request: NextRequest) {
 		}
 
 		const body: AdminUpdateRequest = await request.json();
-		console.log("🔧 Admin update request:", { body });
+
 		
 		// Convert ISO datetime strings to epoch timestamps
 		const validUpdates: Record<string, string | boolean> = {};
 		
 		if (body.start_time) {
 			validUpdates.start_time = dateToEpochString(new Date(body.start_time));
-			console.log("🕐 Converting start_time:", { from: body.start_time, to: validUpdates.start_time });
+	
 		}
 		
 		if (body.finish_time) {
 			validUpdates.finish_time = dateToEpochString(new Date(body.finish_time));
-			console.log("🕐 Converting finish_time:", { from: body.finish_time, to: validUpdates.finish_time });
+	
 		}
 		
 		if (body.is_disqualified !== undefined) {
@@ -49,18 +49,18 @@ export async function PUT(request: NextRequest) {
 			return NextResponse.json({ error: "Username is required" }, { status: 400 });
 		}
 
-		console.log("🔧 Updating swimmer:", { username, updates: validUpdates });
+
 
 		await updateSwimmerAdminFields(username, validUpdates);
 
-		console.log("✅ Swimmer updated successfully");
+
 
 		return NextResponse.json({ 
 			message: "Swimmer updated successfully",
 			updates: validUpdates
 		});
 	} catch (error) {
-		console.error("❌ Admin update error:", error);
+
 		return NextResponse.json({ error: "Failed to update swimmer" }, { status: 500 });
 	}
 }

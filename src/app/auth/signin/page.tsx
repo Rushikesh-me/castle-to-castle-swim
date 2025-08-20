@@ -43,7 +43,7 @@ export default function SignInPage() {
 			});
 
 			if (result?.error) {
-				console.log("Sign in error:", result.error);
+		
 				setError("Invalid username or password");
 			} else {
 				router.push("/dashboard");

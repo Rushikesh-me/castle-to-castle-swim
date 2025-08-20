@@ -45,14 +45,14 @@ export const SwimmerProvider = ({ children }: { children: React.ReactNode }) => 
 
 	// Fast fetch swimmers (basic data only)
 	const fetchSwimmersFast = useCallback(async (category: SwimCategory = selectedCategory) => {
-		console.log("🚀 Fast fetching for category:", category);
+
 		setIsLoading(true);
 		setError(null);
 		try {
 			const response = await fetch(`/api/swimmers/fast?category=${category}`);
 			if (!response.ok) throw new Error(`Failed to fetch swimmers: ${response.status}`);
 			const data = await response.json();
-			console.log("🚀 Fast swimmers response:", data.length);
+	
 			
 			setSwimmers(data);
 			const extractedTracks = extractTracks(data);
@@ -73,7 +73,7 @@ export const SwimmerProvider = ({ children }: { children: React.ReactNode }) => 
 	const enhanceSwimmersData = useCallback(async () => {
 		if (enhancedDataLoaded || swimmers.length === 0) return;
 		
-		console.log("🔧 Enhancing swimmers data...");
+
 		setIsLoadingEnhanced(true);
 		try {
 			const usernames = swimmers.map(s => s.username);
@@ -99,9 +99,9 @@ export const SwimmerProvider = ({ children }: { children: React.ReactNode }) => 
 			const extractedTracks = extractTracks(enhancedSwimmers);
 			setTracks(extractedTracks);
 			setEnhancedDataLoaded(true);
-			console.log("✅ Enhanced data loaded");
+	
 		} catch (err) {
-			console.warn("Failed to enhance swimmers data:", err);
+	
 			// Don't fail completely, just log the warning
 		} finally {
 			setIsLoadingEnhanced(false);
@@ -110,14 +110,14 @@ export const SwimmerProvider = ({ children }: { children: React.ReactNode }) => 
 
 	// Full fetch swimmers (legacy, kept for compatibility)
 	const fetchSwimmers = useCallback(async (category: SwimCategory = selectedCategory) => {
-		console.log("🐌 Full fetching for category:", category);
+
 		setIsLoading(true);
 		setError(null);
 		try {
 			const response = await fetch(`/api/swimmers?category=${category}&page=${page}`);
 			if (!response.ok) throw new Error(`Failed to fetch swimmers: ${response.status}`);
 			const data = await response.json();
-			console.log("🐌 Full swimmers response:", data.length);
+	
 			
 			setSwimmers(data);
 			const extractedTracks = extractTracks(data);

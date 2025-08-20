@@ -42,7 +42,7 @@ async function fetchIdonateTotal(idonateUrl?: string): Promise<number | null> {
 		
 		return amount;
 	} catch (error) {
-		console.warn(`Failed to fetch iDonate total for ${idonateUrl}:`, error);
+
 		return null;
 	}
 }
@@ -116,7 +116,7 @@ export async function batchFetchLocations(usernames: string[], locationLimit: nu
 				
 				return { username, locations };
 			} catch (error) {
-				console.warn(`Failed to fetch locations for ${username}:`, error);
+		
 				return { username, locations: [] };
 			}
 		});
@@ -185,13 +185,13 @@ export async function getActiveSwimmersWithLocations(swimType?: string, location
 		throw new Error("Swim type must be 'solo' or 'relay'");
 	}
 
-	console.log("🔍 Fetching swimmers with type:", swimType, "limit:", locationLimit);
+	
 
 	// Step 1: Get basic swimmer data (fast)
 	const basicSwimmers = await getSwimmersFast(swimType);
 	
 	if (basicSwimmers.length === 0) {
-		console.log("❌ No swimmers found in database");
+
 		return [];
 	}
 
@@ -430,7 +430,7 @@ export async function updateSwimmerAdminFields(
 	},
 	swimTypeHint?: "solo" | "relay"
 ) {
-	console.log("🔧 updateSwimmerAdminFields called:", { username, updates, swimTypeHint });
+	
 	
 	const updateExpressions: string[] = [];
 	const expressionAttributeValues : Record<string, string | null | number | boolean> = {
@@ -451,15 +451,14 @@ export async function updateSwimmerAdminFields(
 	}
 
 	if (updateExpressions.length === 0) {
-		console.log("⚠️ No updates to apply");
+
 		return;
 	}
 
-	console.log("🔧 Update expressions:", updateExpressions);
-	console.log("🔧 Expression attribute values:", expressionAttributeValues);
+	
 
 	const tryUpdate = async (pk: "USER" | "TEAM") => {
-		console.log(`🔄 Trying to update with pk: ${pk}`);
+
 		try {
 			// First check if the item exists
 			const getResult = await ddb.send(new GetCommand({
@@ -468,11 +467,11 @@ export async function updateSwimmerAdminFields(
 			}));
 			
 			if (!getResult.Item) {
-				console.log(`❌ Item not found with pk: ${pk}, sk: ${username}`);
+		
 				throw new Error(`Swimmer not found with pk: ${pk}`);
 			}
 			
-			console.log(`📋 Found item:`, getResult.Item);
+	
 			
 			const result = await ddb.send(new UpdateCommand({
 				TableName: process.env.USERS_TABLE_NAME!,
@@ -480,26 +479,26 @@ export async function updateSwimmerAdminFields(
 				UpdateExpression: `SET ${updateExpressions.join(", ")}, updated_at = :updated`,
 				ExpressionAttributeValues: expressionAttributeValues,
 			}));
-			console.log(`✅ Successfully updated with pk: ${pk}`, result);
+	
 			return result;
 		} catch (error) {
-			console.log(`❌ Failed to update with pk: ${pk}:`, error);
+	
 			throw error;
 		}
 	};
 
 	if (swimTypeHint === "solo") {
-		console.log("🎯 Using solo hint, updating USER");
+
 		await tryUpdate("USER");
 	} else if (swimTypeHint === "relay") {
-		console.log("🎯 Using relay hint, updating TEAM");
+
 		await tryUpdate("TEAM");
 	} else {
-		console.log("🎯 No hint, trying USER first, then TEAM");
+
 		try {
 			await tryUpdate("USER");
 		} catch (error) {
-			console.log("🔄 USER update failed, trying TEAM");
+	
 			await tryUpdate("TEAM");
 		}
 	}

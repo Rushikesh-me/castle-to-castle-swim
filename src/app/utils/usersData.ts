@@ -114,15 +114,15 @@ export function getMarkerPosition(swimmer: SwimmerTrack): { lat: number; lng: nu
  * Enhanced function to extract and validate swim tracks from raw swimmer data
  */
 export function extractTracks(swimmers: SwimmerTrack[]): DrawTrack[] {
-	console.log("🔄 extractTracks called with:", swimmers?.length || 0, "swimmers");
+
 
 	if (!Array.isArray(swimmers)) {
-		console.error("❌ Invalid swimmers data - not an array:", typeof swimmers);
+
 		return [];
 	}
 
 	if (swimmers.length === 0) {
-		console.log("⚠️ No swimmers provided to extractTracks");
+
 		return [];
 	}
 
@@ -130,7 +130,7 @@ export function extractTracks(swimmers: SwimmerTrack[]): DrawTrack[] {
 		.filter((swimmer) => {
 			// Validate swimmer object structure
 			if (!swimmer.username) {
-				console.warn(`⚠️ Swimmer missing username:`, swimmer);
+		
 				return false;
 			}
 
@@ -149,7 +149,7 @@ export function extractTracks(swimmers: SwimmerTrack[]): DrawTrack[] {
 				isNaN(markerPosition.lng) ||
 				!isFinite(markerPosition.lat) || 
 				!isFinite(markerPosition.lng)) {
-				console.warn(`⚠️ Skipping swimmer ${swimmer.username} with invalid marker position:`, markerPosition);
+		
 				return null;
 			}
 			
@@ -169,10 +169,20 @@ export function extractTracks(swimmers: SwimmerTrack[]): DrawTrack[] {
 
 			// Convert locations to Google Maps LatLngLiteral format
 			// LocationPoint uses 'lon', Google Maps uses 'lng'
-			const pathPoints = (swimmer.locations || []).map((location) => ({
-				lat: location.lat,
-				lng: location.lon, // Convert lon to lng for Google Maps
-			}));
+			const pathPoints = (swimmer.locations || [])
+				.filter((location) => 
+					location && 
+					typeof location.lat === 'number' && 
+					typeof location.lon === 'number' &&
+					isFinite(location.lat) && 
+					isFinite(location.lon) &&
+					location.lat >= -90 && location.lat <= 90 &&
+					location.lon >= -180 && location.lon <= 180
+				)
+				.map((location) => ({
+					lat: location.lat,
+					lng: location.lon, // Convert lon to lng for Google Maps
+				}));
 
 			// Always create a track, even if no locations
 			const track: DrawTrack = {
@@ -188,7 +198,7 @@ export function extractTracks(swimmers: SwimmerTrack[]): DrawTrack[] {
 		})
 		.filter((track): track is DrawTrack => track !== null);
 
-	console.log(`🎯 Final tracks created:`, validTracks.length);
+
 	return validTracks;
 }
 

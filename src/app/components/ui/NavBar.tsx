@@ -5,6 +5,7 @@ import { Dialog, DialogPanel, Popover, PopoverButton, PopoverGroup, PopoverPanel
 import { ArrowPathIcon, Bars3Icon, ChartPieIcon, CursorArrowRaysIcon, FingerPrintIcon, SquaresPlusIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import { ChevronDownIcon, PhoneIcon, PlayCircleIcon } from "@heroicons/react/20/solid";
 import Link from "next/link";
+import { Button } from "./button";
 
 const products = [
 	{ name: "Analytics", description: "Get a better understanding of your traffic", href: "#", icon: ChartPieIcon },
@@ -32,8 +33,8 @@ const NavBar = () => {
 	const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
 	return (
-		<header className="bg-white z-[99] w-full fixed top-0">
-			<nav aria-label="Global" className="mx-auto flex max-w-7xl items-center justify-between px-6 py-2 lg:px-8">
+		<header className="bg-white z-[99] w-full fixed top-0 border-b-2 border-border">
+			<nav aria-label="Global" className="mx-auto flex max-w-7xl items-center justify-between px-6 py-2 lg:px-4">
 				<div className="flex lg:flex-1">
 					<Link href="/" className="-m-1.5 p-1.5">
 						<span className="sr-only">CastleSwim</span>
@@ -57,9 +58,9 @@ const NavBar = () => {
 					
 				</PopoverGroup>
 				<div className="hidden lg:flex lg:flex-1 lg:justify-end">
-					<Link href="/dashboard" className="text-sm font-semibold leading-6 text-gray-900">
-						Swimmers Dashboard <span aria-hidden="true">&rarr;</span>
-					</Link>
+					<Button variant="outline" onClick={() => window.open("https://www.idonate.ie/event/castletocastle25", "_blank")} className="bg-primary font-semibold text-lg text-white hover:bg-primary/80 hover:text-white">
+						Donate
+					</Button>
 				</div>
 			</nav>
 			<Dialog open={mobileMenuOpen} onClose={setMobileMenuOpen} className="lg:hidden">

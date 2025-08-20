@@ -8,12 +8,12 @@ export async function GET(request: NextRequest) {
 		const session = await auth();
 
 		const { searchParams } = new URL(request.url);
-		console.log("search params" , searchParams)
+	
 		const swimType = searchParams.get("category"); // "solo" or "relay"
 		const locationLimit = Math.min(Math.max(parseInt(searchParams.get("location_limit") || "20"), 1), 100); // Limit between 1-100
 
 		// Always fetch swimmers with locations (removed active parameter requirement)
-		console.log("fetching for swimType : ", swimType)
+	
 		// Any user can see swimmers with recent locations
 		const swimmers = await getActiveSwimmersWithLocations(swimType || undefined, locationLimit);
 		return NextResponse.json(swimmers);

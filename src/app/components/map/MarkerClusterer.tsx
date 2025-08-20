@@ -37,10 +37,7 @@ export function MarkerClusterer({ tracks, onMarkerClick, selectedSwimmer, swimme
   const [clusters, setClusters] = useState<Cluster[]>([]);
   const map = useMap();
 
-  console.log("🎯 MarkerClusterer received:", {
-    tracksCount: tracks.length,
-    swimmersCount: swimmers.length
-  });
+  
 
   // Cluster markers that are close together
   const createClusters = (tracks: DrawTrack[], zoom: number): Cluster[] => {
@@ -57,17 +54,17 @@ export function MarkerClusterer({ tracks, onMarkerClick, selectedSwimmer, swimme
         isFinite(track.current.lon);
       
       if (!isValid) {
-        console.warn(`⚠️ Skipping track ${track.id} with invalid coordinates:`, track.current);
+        
       }
       return isValid;
     });
 
     if (validTracks.length === 0) {
-      console.log("⚠️ No valid tracks to cluster");
+      
       return [];
     }
 
-    console.log(`🔍 Processing ${validTracks.length} valid tracks out of ${tracks.length} total`);
+    
 
     const clusters: Cluster[] = [];
     const clusterRadius = Math.max(50, 1000 / Math.pow(2, zoom)); // Adjust radius based on zoom
@@ -118,36 +115,24 @@ export function MarkerClusterer({ tracks, onMarkerClick, selectedSwimmer, swimme
   useEffect(() => {
     if (map) {
       const zoom = map.getZoom() || 14;
-      console.log("🗺️ Creating clusters with zoom level:", zoom);
+      
       const newClusters = createClusters(tracks, zoom);
-      console.log("📊 Created clusters:", newClusters.length);
-      console.log("📊 Cluster details:", newClusters.map(c => ({ 
-        center: c.center, 
-        trackCount: c.tracks.length,
-        firstTrack: c.tracks[0]?.id 
-      })));
+
       setClusters(newClusters);
     } else {
       // If no map yet, create clusters with default zoom
-      console.log("🗺️ No map yet, creating clusters with default zoom");
       const newClusters = createClusters(tracks, 14);
-      console.log("📊 Created clusters with default zoom:", newClusters.length);
-      console.log("📊 Cluster details:", newClusters.map(c => ({ 
-        center: c.center, 
-        trackCount: c.tracks.length,
-        firstTrack: c.tracks[0]?.id 
-      })));
       setClusters(newClusters);
     }
   }, [tracks, map]);
 
   // If no clusters yet, show loading
   if (clusters.length === 0) {
-    console.log("⏳ No clusters yet, waiting for map...");
+
     return null;
   }
 
-  console.log("🎯 Rendering clusters:", clusters.length);
+
 
   return (
     <>
@@ -164,14 +149,14 @@ export function MarkerClusterer({ tracks, onMarkerClick, selectedSwimmer, swimme
               isNaN(track.current.lon) ||
               !isFinite(track.current.lat) || 
               !isFinite(track.current.lon)) {
-            console.warn(`⚠️ Skipping invalid marker for track ${track.id}:`, track.current);
+
             return null;
           }
           
           const swimmerData = swimmers.find(s => s.username === track.id);
           const isSelected = selectedSwimmer?.id === track.id;
           
-          console.log(`📍 Rendering single marker for ${track.id} at:`, { lat: track.current.lat, lng: track.current.lon });
+
           
           return (
             <AdvancedMarker
@@ -222,11 +207,11 @@ export function MarkerClusterer({ tracks, onMarkerClick, selectedSwimmer, swimme
               isNaN(cluster.center.lng) ||
               !isFinite(cluster.center.lat) || 
               !isFinite(cluster.center.lng)) {
-            console.warn(`⚠️ Skipping invalid cluster center:`, cluster.center);
+
             return null;
           }
           
-          console.log(`📍 Rendering cluster with ${cluster.tracks.length} markers at:`, cluster.center);
+
           
           return (
             <AdvancedMarker
@@ -236,7 +221,7 @@ export function MarkerClusterer({ tracks, onMarkerClick, selectedSwimmer, swimme
                 // Show popup for the first person in the cluster
                 const firstTrack = cluster.tracks[0];
                 if (firstTrack) {
-                  console.log(`🎯 Cluster clicked, showing popup for first person: ${firstTrack.id}`);
+
                   onMarkerClick(firstTrack);
                 }
               }}

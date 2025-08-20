@@ -722,10 +722,7 @@ export default function Dashboard() {
 												const finishMinute = parseInt(formData.get('finish_time_minute') as string) || 0;
 												const finishSecond = parseInt(formData.get('finish_time_second') as string) || 0;
 												
-												console.log("📝 Form submitted:", { 
-													startDate, startHour, startMinute, startSecond,
-													finishDate, finishHour, finishMinute, finishSecond
-												});
+												
 												
 												const updates: Partial<SwimmerUser> = {};
 												
@@ -733,21 +730,18 @@ export default function Dashboard() {
 												if (startDate) {
 													const startDateTime = new Date(`${startDate}T${startHour.toString().padStart(2, '0')}:${startMinute.toString().padStart(2, '0')}:${startSecond.toString().padStart(2, '0')}`);
 													updates.start_time = startDateTime.toISOString();
-													console.log("📝 Start time update:", updates.start_time);
+
 												}
 												
 												// Build finish time ISO string if date is provided
 												if (finishDate) {
 													const finishDateTime = new Date(`${finishDate}T${finishHour.toString().padStart(2, '0')}:${finishMinute.toString().padStart(2, '0')}:${finishSecond.toString().padStart(2, '0')}`);
 													updates.finish_time = finishDateTime.toISOString();
-													console.log("📝 Finish time update:", updates.finish_time);
+
 												}
 												
 												if (Object.keys(updates).length > 0) {
-													console.log("📝 Sending updates to API:", updates);
 													updateSwimmerAdminFields(swimmer.username, updates, swimmer.swim_type as "solo" | "relay");
-												} else {
-													console.log("⚠️ No updates to send");
 												}
 											}} className="space-y-3">
 												<div className="flex flex-col md:flex-row gap-3 text-sm">

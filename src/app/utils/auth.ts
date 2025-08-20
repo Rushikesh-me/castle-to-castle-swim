@@ -42,7 +42,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 			},
 			async authorize(credentials) {
 				const validatedFields = LoginSchema.safeParse(credentials);
-				console.log("Validated fields:", validatedFields);
+		
 				if (!validatedFields.success) {
 					return null;
 				}
@@ -88,7 +88,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 						bio: (user as Partial<SwimmerUser>).bio || "",
 					};
 				} catch (error) {
-					console.error("Authentication error:", error);
+			
 					return null;
 				}
 			},

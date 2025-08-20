@@ -45,7 +45,27 @@ function usePolyline(props: PolylineProps) {
 
 	// update PolylineOptions
 	useMemo(() => {
-		polyline.setOptions(polylineOptions);
+		// Validate path coordinates before setting options
+		if (polylineOptions.path && Array.isArray(polylineOptions.path)) {
+			const validPath = polylineOptions.path.filter(point => 
+				point && 
+				typeof point.lat === 'number' && 
+				typeof point.lng === 'number' &&
+				isFinite(point.lat) && 
+				isFinite(point.lng) &&
+				point.lat >= -90 && point.lat <= 90 &&
+				point.lng >= -180 && point.lng <= 180
+			);
+			
+
+			
+			polyline.setOptions({
+				...polylineOptions,
+				path: validPath
+			});
+		} else {
+			polyline.setOptions(polylineOptions);
+		}
 	}, [polyline, polylineOptions]);
 
 	const map = useContext(GoogleMapsContext)?.map;
@@ -53,14 +73,33 @@ function usePolyline(props: PolylineProps) {
 	// update the path with the encodedPath
 	useMemo(() => {
 		if (!encodedPath || !geometryLibrary) return;
-		const path = geometryLibrary.encoding.decodePath(encodedPath);
-		polyline.setPath(path);
+		try {
+			const path = geometryLibrary.encoding.decodePath(encodedPath);
+			// Validate decoded path coordinates
+			const validPath = path.filter(point => 
+				point && 
+				typeof point.lat === 'number' && 
+				typeof point.lng === 'number' &&
+				isFinite(point.lat) && 
+				isFinite(point.lng) &&
+				point.lat >= -90 && point.lat <= 90 &&
+				point.lng >= -180 && point.lng <= 180
+			);
+			
+
+			
+			polyline.setPath(validPath);
+		} catch (error) {
+			// Silently handle decoding errors
+		}
 	}, [polyline, encodedPath, geometryLibrary]);
 
 	// create polyline instance and add to the map once the map is available
 	useEffect(() => {
 		if (!map) {
-			if (map === undefined) console.error("<Polyline> has to be inside a Map component.");
+			if (map === undefined) {
+			// Component must be inside a Map component
+		}
 
 			return;
 		}

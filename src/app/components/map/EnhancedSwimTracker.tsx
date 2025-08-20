@@ -66,9 +66,7 @@ export default function EnhancedSwimTracker() {
 	// Process swimmer data into drawable tracks
 	const availableSwimmers = useMemo(() => {
 		// Show all swimmers, even if they have no location history
-		console.log("Available swimmers:", tracks.length, "Swimmers data:", swimmers.length);
-		console.log("Raw tracks:", tracks);
-		console.log("Raw swimmers:", swimmers.slice(0, 3)); // Show first 3
+
 		
 		
 		
@@ -269,7 +267,12 @@ export default function EnhancedSwimTracker() {
 				<div className="bg-white/90 backdrop-blur-sm rounded-lg shadow-lg border border-gray-200">
 					<div className="flex">
 						<button
-							onClick={() => setSelectedCategory("solo")}
+							onClick={() => {
+								if(selectedCategory !== "solo") {
+									setSelectedSwimmer(null);
+									setSelectedCategory("solo")
+								}
+							}}
 							className={`flex items-center px-8 py-2 rounded-l-lg transition-all text-sm lg:text-xl ${
 								selectedCategory === "solo"
 									? "bg-blue-500 text-white shadow-md"
@@ -280,7 +283,12 @@ export default function EnhancedSwimTracker() {
 							Solo
 						</button>
 						<button
-							onClick={() => setSelectedCategory("relay")}
+							onClick={() => {
+								if(selectedCategory !== "relay") {
+									setSelectedSwimmer(null);
+									setSelectedCategory("relay")
+								}
+							}}
 							className={`flex items-center px-8 py-2 rounded-r-lg transition-all text-sm lg:text-xl ${
 								selectedCategory === "relay"
 									? "bg-blue-500 text-white shadow-md"
@@ -340,7 +348,18 @@ export default function EnhancedSwimTracker() {
 					{selectedSwimmer && swimmerHistory.length > 0 ? (
 						<Polyline
 							key={`${selectedSwimmer.id}-history`}
-							path={swimmerHistory.map(loc => ({ lat: loc.lat, lng: loc.lon }))}
+							path={swimmerHistory
+								.filter(loc => 
+									loc && 
+									typeof loc.lat === 'number' && 
+									typeof loc.lon === 'number' &&
+									isFinite(loc.lat) && 
+									isFinite(loc.lon) &&
+									loc.lat >= -90 && loc.lat <= 90 &&
+									loc.lon >= -180 && loc.lon <= 180
+								)
+								.map(loc => ({ lat: loc.lat, lng: loc.lon }))
+							}
 							geodesic={true}
 							strokeColor="#FF6B35"
 							strokeOpacity={0.8}
@@ -348,17 +367,19 @@ export default function EnhancedSwimTracker() {
 							zIndex={1000}
 						/>
 					) : (
-						tracks.map((track, index) => (
-							<Polyline
-								key={track.id}
-								path={track.points}
-								geodesic={true}
-								strokeColor={`hsl(${index * 60}, 70%, 50%)`}
-								strokeOpacity={0.6}
-								strokeWeight={3}
-								zIndex={1000}
-							/>
-						))
+						tracks
+							.filter(track => track.points && track.points.length > 0)
+							.map((track, index) => (
+								<Polyline
+									key={track.id}
+									path={track.points}
+									geodesic={true}
+									strokeColor={`hsl(${index * 60}, 70%, 50%)`}
+									strokeOpacity={0.6}
+									strokeWeight={3}
+									zIndex={1000}
+								/>
+							))
 					)}
 
 					{/* Enhanced Markers with Profile Pictures */}
@@ -396,15 +417,15 @@ export default function EnhancedSwimTracker() {
 						</Fragment>
 					) : (
 						<>
-							{/* Test marker to verify Google Maps is working */}
-							<AdvancedMarker
+							
+							{/* <AdvancedMarker
 								position={{ lat: 53.541085, lng: -8.005591 }}
 								zIndex={1000}
 							>
 								<div className="w-8 h-8 bg-red-500 rounded-full flex items-center justify-center">
 									<span className="text-white text-xs font-bold">T</span>
 								</div>
-							</AdvancedMarker>
+							</AdvancedMarker> */}
 							
 							<MarkerClusterer
 								tracks={availableSwimmers}
@@ -422,33 +443,33 @@ export default function EnhancedSwimTracker() {
 				</Map>
 			</APIProvider>
 
-			{/* Enhanced Bottom Sheet */}
+			{/* Bottom Popup */}
 			{showBottomSheet && selectedSwimmer && (
 				<div className={
-					`fixed inset-x-0 bottom-0 z-50 bg-white rounded-t-xl shadow-2xl border-t
+					`fixed inset-x-0 bottom-0 z-50 bg-white rounded-t-xl shadow-2xl border-t-2 border-border
 					transform transition-transform duration-300 ease-out
 					${showBottomSheet ? 'translate-y-0' : 'translate-y-full'}`
 				}>
-					<div className="p-6 max-h-[80vh] overflow-y-auto">
-						{/* Header */}
-						<div className="flex items-center justify-between mb-4">
-							<div className="flex items-center space-x-3">
+					<div className="p-4 max-h-[60vh] overflow-y-auto">
+						{/* Header with Profile Info and Donations */}
+						<div className="flex items-start justify-between mb-3">
+							<div className="flex items-start space-x-3 flex-1">
 								{/* Profile photo */}
 								{swimmers.find(s => s.username === selectedSwimmer.id)?.avatar ? (
 									<img 
 										src={swimmers.find(s => s.username === selectedSwimmer.id)?.avatar} 
 										alt={selectedSwimmer.label}
-										className="w-12 h-12 rounded-full border-2 border-blue-200"
+										className="w-12 h-12 rounded-full border-2 border-blue-200 flex-shrink-0"
 									/>
 								) : (
-									<div className="w-12 h-12 bg-blue-500 rounded-full flex items-center justify-center">
+									<div className="w-12 h-12 bg-blue-500 rounded-full flex items-center justify-center flex-shrink-0">
 										<span className="text-white font-bold text-lg">
 											{selectedSwimmer.label.charAt(0).toUpperCase()}
 										</span>
 									</div>
 								)}
-								<div>
-									<h3 className="text-lg font-bold text-gray-900">
+								<div className="flex-1 min-w-0">
+									<h3 className="text-lg font-bold text-gray-900 truncate">
 										{currentSwimmerData?.swim_type === 'relay' 
 											? currentSwimmerData.team_name || selectedSwimmer.label
 											: `${currentSwimmerData?.first_name || ""} ${currentSwimmerData?.last_name || ""}`.trim() || selectedSwimmer.label
@@ -464,50 +485,37 @@ export default function EnhancedSwimTracker() {
 									)}
 								</div>
 							</div>
+							
+							{/* Donations Total - Right side */}
+							<div className="text-right ml-3 flex-shrink-0">
+								<div className="bg-green-100 rounded-lg p-2 border border-green-200">
+									<p className="text-xs text-green-700 font-medium">Total Donations</p>
+									<p className="text-lg font-bold text-green-800">
+										{typeof currentSwimmerData?.donations_total === 'number' ?
+											`€${(currentSwimmerData.donations_total as number).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '€0.00'}
+									</p>
+								</div>
+							</div>
+							
+							{/* Close button */}
 							<Button
 								variant="ghost"
 								size="sm"
 								onClick={closeBottomSheet}
-								className="text-gray-500 hover:text-gray-700"
+								className="text-gray-500 hover:text-gray-700 ml-2 flex-shrink-0"
 							>
 								<X className="w-5 h-5" />
 							</Button>
 						</div>
 
-						{/* Rankings and Progress */}
-						{swimmerStats && (
-							<div className="grid grid-cols-2 gap-3 mb-4">
-								<Card className="p-3">
-									<div className="text-center">
-										<div className="flex items-center justify-center mb-1">
-											<Trophy className="w-4 h-4 mr-1 text-yellow-500" />
-											<p className="text-xs text-gray-500">Donations Rank</p>
-										</div>
-										<p className="text-sm font-bold text-yellow-600">
-											#{swimmerStats.donationsRanking || 'N/A'}
-										</p>
-									</div>
-								</Card>
-								<Card className="p-3">
-									<div className="text-center">
-										<div className="flex items-center justify-center mb-1">
-											<MapPin className="w-4 h-4 mr-1 text-blue-500" />
-											<p className="text-xs text-gray-500">Swim Position</p>
-										</div>
-										<p className="text-sm font-bold text-blue-600">
-											{swimmerStats.swimPositionRanking > 0 ? `#${swimmerStats.swimPositionRanking}` : 'N/A'}
-										</p>
-									</div>
-								</Card>
-							</div>
-						)}
-
-						{/* Race Progress */}
-						{swimmerStats && swimmerStats.raceProgress > 0 && (
-							<Card className="p-4 mb-4">
-								<div className="flex items-center mb-2">
-									<Percent className="w-4 h-4 mr-2 text-green-500" />
-									<span className="text-sm font-semibold text-gray-700">Race Progress</span>
+						{/* Race Progress Bar - Only show if race is active */}
+						{swimmerStats && currentSwimmerData?.start_time && 
+						 hasRaceStartedUtil(currentSwimmerData.start_time) && 
+						 !currentSwimmerData?.finish_time && (
+							<div className="mb-3">
+								<div className="flex items-center justify-between mb-1">
+									<span className="text-sm font-medium text-gray-700">Race Progress</span>
+									<span className="text-sm text-gray-600">{swimmerStats.raceProgress.toFixed(1)}%</span>
 								</div>
 								<div className="w-full bg-gray-200 rounded-full h-2">
 									<div 
@@ -515,131 +523,46 @@ export default function EnhancedSwimTracker() {
 										style={{ width: `${swimmerStats.raceProgress}%` }}
 									></div>
 								</div>
-								<p className="text-xs text-gray-600 mt-1 text-center">
-									{swimmerStats.raceProgress.toFixed(1)}% completed
-								</p>
-							</Card>
-						)}
-
-						{/* Bio */}
-						{currentSwimmerData?.bio && (
-							<Card className="p-4 mb-4">
-								<h4 className="font-semibold text-gray-900 mb-2">Bio</h4>
-								<p className="text-sm text-gray-700">{currentSwimmerData.bio}</p>
-							</Card>
-						)}
-
-						{/* Race Times */}
-						{(currentSwimmerData?.start_time || currentSwimmerData?.finish_time) && (
-							<Card className="p-4 mb-4">
-								<h4 className="font-semibold text-gray-900 mb-2">Race Times</h4>
-								<div className="space-y-2 text-sm">
-									{currentSwimmerData?.start_time && (
-										<div className="flex justify-between">
-											<span className="text-gray-600">Start Time:</span>
-											<span className="font-medium">{formatEpochStringUtil(currentSwimmerData.start_time, 'datetime')}</span>
-										</div>
-									)}
-									{currentSwimmerData?.finish_time && (
-										<div className="flex justify-between">
-											<span className="text-gray-600">Finish Time:</span>
-											<span className="font-medium">{formatEpochStringUtil(currentSwimmerData.finish_time, 'datetime')}</span>
-										</div>
-									)}
-									{currentSwimmerData?.start_time && !currentSwimmerData?.finish_time && (
-										<div className="flex justify-between">
-											<span className="text-gray-600">Status:</span>
-											<span className={`font-medium ${hasRaceStartedUtil(currentSwimmerData.start_time) ? 'text-green-600' : 'text-yellow-600'}`}>
-												{hasRaceStartedUtil(currentSwimmerData.start_time) ? 'In Progress' : 'Not Started'}
-											</span>
-										</div>
-									)}
-								</div>
-							</Card>
-						)}
-
-						{/* Donate and Share */}
-						<div className="flex items-center justify-between mb-4">
-							<div className="text-sm text-gray-600">
-								<span className="mr-3">Type: {currentSwimmerData?.swim_type === 'relay' ? 'Relay' : 'Solo'}</span>
-								<span>
-									Donations: {typeof currentSwimmerData?.donations_total === 'number' ?
-										`€${(currentSwimmerData.donations_total as number).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'NA'}
-								</span>
 							</div>
-						</div>
+						)}
 
-						<div className="flex gap-3 mb-4">
+
+
+						{/* Bio - Compact */}
+						{currentSwimmerData?.bio && (
+							<div className="mb-3">
+								<p className="text-sm text-gray-700 leading-relaxed">{currentSwimmerData.bio}</p>
+							</div>
+						)}
+
+						{/* Action Buttons */}
+						<div className="flex gap-3 mb-3">
 							{currentSwimmerData?.idonate_url ? (
 								<a href={currentSwimmerData.idonate_url} target="_blank" rel="noopener noreferrer" className="flex-1">
-									<Button className="w-full bg-green-600 hover:bg-green-700">Donate now</Button>
+									<Button className="w-full bg-green-600 hover:bg-green-700 text-white">
+										Donate Now
+									</Button>
 								</a>
 							) : (
-								<Button variant="outline" disabled className="flex-1">Donate now</Button>
+								<Button variant="outline" disabled className="flex-1">
+									Donate Now
+								</Button>
 							)}
 							<Button 
 								variant="outline" 
 								onClick={handleShare}
-								className="flex items-center"
+								className="flex items-center border-gray-300 text-gray-700 hover:bg-gray-50"
 							>
 								<Share2 className="w-4 h-4 mr-2" />
 								Share
 							</Button>
 						</div>
 
-						{/* Stats Cards */}
-						{swimmerStats && (
-							<div className="grid grid-cols-3 gap-3 mb-4">
-								<Card className="p-3">
-									<div className="text-center">
-										<p className="text-xs text-gray-500 mb-1">Distance</p>
-										<p className="text-sm font-bold text-blue-600">
-											{formatDistance(swimmerStats.totalDistance)}
-										</p>
-									</div>
-								</Card>
-								<Card className="p-3">
-									<div className="text-center">
-										<div className="text-center">
-											<p className="text-xs text-gray-500 mb-1">Duration</p>
-											<p className="text-sm font-bold text-green-600">
-												{formatDuration(swimmerStats.duration)}
-											</p>
-										</div>
-									</div>
-								</Card>
-								<Card className="p-3">
-									<div className="text-center">
-										<p className="text-xs text-gray-500 mb-1">Avg Pace</p>
-										<p className="text-sm font-bold text-purple-600">
-											{swimmerStats.averagePace > 0 ? `${swimmerStats.averagePace.toFixed(1)}min/100m` : "N/A"}
-										</p>
-									</div>
-								</Card>
-							</div>
-						)}
 
-						{/* Team details for relay */}
-						{currentSwimmerData?.swim_type === 'relay' && (
-							<div className="mb-4">
-								<h4 className="font-semibold text-gray-900 mb-2">Team</h4>
-								<div className="text-sm text-gray-700">
-									<div className="mb-1">
-										Captain: {currentSwimmerData.team_captain?.first_name} {currentSwimmerData.team_captain?.last_name}
-									</div>
-									<div>
-										Members:
-										<ul className="list-disc pl-5">
-											{(currentSwimmerData.members || []).map((m, i) => (
-												<li key={i}>{m.first_name} {m.last_name}</li>
-											))}
-										</ul>
-									</div>
-								</div>
-							</div>
-						)}
 
-						{/* Navigation */}
+
+
+						{/* Navigation - Fixed styling */}
 						{availableSwimmers.length > 1 && (
 							<div className="flex items-center justify-between pt-3 border-t border-gray-200">
 								<Button
@@ -647,7 +570,7 @@ export default function EnhancedSwimTracker() {
 									size="sm"
 									onClick={() => navigateSwimmer('prev')}
 									disabled={loadingHistory}
-									className="flex items-center bg-"
+									className="flex items-center border-gray-300 text-gray-700 hover:bg-gray-50"
 								>
 									<ChevronLeft className="w-4 h-4 mr-1" />
 									Previous
@@ -660,7 +583,7 @@ export default function EnhancedSwimTracker() {
 									size="sm"
 									onClick={() => navigateSwimmer('next')}
 									disabled={loadingHistory}
-									className="flex items-center"
+									className="flex items-center border-gray-300 text-gray-700 hover:bg-gray-50"
 								>
 									Next
 									<ChevronRight className="w-4 h-4 ml-1" />
@@ -670,10 +593,10 @@ export default function EnhancedSwimTracker() {
 
 						{/* Loading indicator for history */}
 						{loadingHistory && (
-							<div className="flex items-center justify-center py-4">
-								<Loader2 className="w-5 h-5 animate-spin mr-2" />
+							<div className="flex items-center justify-center py-3">
+								<Loader2 className="w-4 h-4 animate-spin mr-2" />
 								<span className="text-sm text-gray-600">Loading swimmer history...</span>
-								</div>
+							</div>
 						)}
 					</div>
 				</div>
@@ -695,7 +618,8 @@ function MapBoundsUpdater({ swimmerHistory, selectedSwimmer }: {
 			swimmerHistory.forEach((location: LocationPoint) => {
 				bounds.extend({ lat: location.lat, lng: location.lon });
 			});
-			map.fitBounds(bounds, 50);
+			// Add more padding and reduce zoom for better visibility
+			map.fitBounds(bounds, 100);
 		}
 	}, [map, selectedSwimmer, swimmerHistory]);
 

@@ -49,7 +49,7 @@ export default function SignUpPage() {
 	const onSubmit = async (data: SignUpFormData) => {
 		setIsLoading(true);
 		setError("");
-		console.log("Form data:", data);
+
 
 		try {
 			const response = await fetch("/api/auth/signup", {
@@ -64,7 +64,7 @@ export default function SignUpPage() {
 				setError(errorData.error || "Failed to create account");
 			}
 		} catch (err) {
-			console.error("Error creating account:", err);
+	
 			setError(err instanceof Error ? err.message : "Something went wrong");
 			return;
 		} finally {
