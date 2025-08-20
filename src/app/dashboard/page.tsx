@@ -128,7 +128,12 @@ export default function Dashboard() {
 				setPreviewUrl(null);
 				setSelectedFile(null);
 				showMessage("Profile picture uploaded successfully!", "success");
-				await update();
+				// Update the session with the new avatar and bio
+				await update({
+					...session?.user,
+					avatar: result.avatar,
+					bio: result.bio,
+				});
 			} else {
 				const error = await response.json();
 				showMessage(error.error || "Failed to upload image", "error");

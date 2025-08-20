@@ -18,11 +18,27 @@ export async function POST(request: NextRequest) {
 		}
 
 		const formData = await request.formData();
-		const file = formData.get('file') as File;
+		const file = formData.get('image') as File;
 		const bio = formData.get('bio') as string;
 
+		// Debug logging
+		console.log("FormData received:", {
+			hasFile: !!file,
+			fileName: file?.name,
+			fileSize: file?.size,
+			fileType: file?.type,
+			bio: bio
+		});
+
 		if (!file) {
-			return NextResponse.json({ error: "No file provided" }, { status: 400 });
+			return NextResponse.json({ 
+				error: "No file provided", 
+				debug: {
+					formDataKeys: Array.from(formData.keys()),
+					imageField: formData.get('image'),
+					bioField: formData.get('bio')
+				}
+			}, { status: 400 });
 		}
 
 		// Validate file type
@@ -37,7 +53,8 @@ export async function POST(request: NextRequest) {
 
 		const arrayBuffer = await file.arrayBuffer();
 		const buffer = Buffer.from(arrayBuffer);
-		const fileKey = `profiles/${session.user.name}-${Date.now()}.jpg`;
+		const fileKey = `profiles/${session.user.name}.jpg`;
+
 
 		const command = new PutObjectCommand ({
 			Bucket: "castle-to-castle-swim",
