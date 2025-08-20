@@ -11,6 +11,7 @@ type CreateUserData = {
 	team_name: string;
 	swim_type: "solo" | "relay";
 	avatar?: string;
+	idonate_url?: string;
 };
 
 export async function POST(request: NextRequest) {
@@ -25,6 +26,7 @@ export async function POST(request: NextRequest) {
 			team_name: validatedData.team_name || "solo",
 			swim_type: validatedData.swim_type,
 			avatar: validatedData.avatar || "",
+			idonate_url: (body.idonate_url as string | undefined) || undefined,
 		};
 
 		await createUser(userData as SwimmerUser);

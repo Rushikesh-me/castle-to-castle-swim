@@ -19,6 +19,7 @@ type SignUpFormData = {
 	team_name: string;
 	swim_type: "solo" | "relay";
 	avatar?: string;
+	idonate_url?: string;
 };
 
 export default function SignUpPage() {
@@ -41,6 +42,7 @@ export default function SignUpPage() {
 			team_name: "solo",
 			swim_type: "solo",
 			avatar: "",
+			idonate_url: "",
 		}
 	});
 
@@ -121,6 +123,11 @@ export default function SignUpPage() {
 								{errors.team_name && <p className="text-sm text-red-600 mt-1">{errors.team_name.message}</p>}
 							</div>
 						)}
+
+                        <div>
+                            <label className="block text-sm font-medium mb-1">iDonate URL (Optional)</label>
+                            <Input {...register("idonate_url")} placeholder="https://www.idonate.ie/..." />
+                        </div>
 
 						<div>
 							<label className="block text-sm font-medium mb-1">Avatar URL (Optional)</label>

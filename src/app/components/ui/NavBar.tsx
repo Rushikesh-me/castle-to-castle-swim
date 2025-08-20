@@ -57,7 +57,7 @@ const NavBar = () => {
 					
 				</PopoverGroup>
 				<div className="hidden lg:flex lg:flex-1 lg:justify-end">
-					<Link href="/auth/signin" className="text-sm font-semibold leading-6 text-gray-900">
+					<Link href="/dashboard" className="text-sm font-semibold leading-6 text-gray-900">
 						Swimmers Dashboard <span aria-hidden="true">&rarr;</span>
 					</Link>
 				</div>

@@ -3,6 +3,7 @@
 import { APIProvider, Map, AdvancedMarker, useMap } from "@vis.gl/react-google-maps";
 import { Fragment, useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { Polyline } from "@/app/components/map/Polyline";
+import { MarkerClusterer } from "@/app/components/map/MarkerClusterer";
 import { Card} from "@/app/components/ui/card";
 import { Button } from "@/app/components/ui/button";
 import type { DrawTrack, LocationPoint } from "@/app/types";
@@ -13,29 +14,66 @@ import {
 	Loader2, 
 	Users, 
 	User,
+	Share2,
+	Trophy,
+	MapPin,
+	Percent,
+	RefreshCw,
 } from "lucide-react";
+import { useSearchParams } from "next/navigation";
 import { useSwimmers } from "@/app/utils/providers/SwimmerProvider";
+import { hasRaceStarted as hasRaceStartedUtil, formatEpochString as formatEpochStringUtil } from "@/app/utils/timeUtils";
+import { calculateRaceProgress } from "@/app/utils/usersData";
 
 interface SwimmerStats {
 	totalDistance: number;
 	duration: number;
 	averagePace: number;
 	currentLocation: LocationPoint;
+	raceProgress: number;
+	donationsRanking: number;
+	swimPositionRanking: number;
 }
 
 export default function EnhancedSwimTracker() {
-	//@ts-nocheck
-	const { swimmers, tracks, isLoading, error, selectedCategory, setSelectedCategory, fetchSwimmers, swimmerHistory, fetchSwimmerHistory, loadingHistory, page, setPage, hasMore} = useSwimmers();
+	const searchParams = useSearchParams();
+	const { swimmers, tracks, isLoading, isLoadingEnhanced, error, selectedCategory, setSelectedCategory, fetchSwimmers, swimmerHistory, fetchSwimmerHistory, loadingHistory, page, setPage, hasMore, selectedSwimmerFromUrl, setSelectedSwimmerFromUrl } = useSwimmers();
 	const [selectedSwimmer, setSelectedSwimmer] = useState<DrawTrack | null>(null);
 	const [showBottomSheet, setShowBottomSheet] = useState(false);
 	const [currentSwimmerIndex, setCurrentSwimmerIndex] = useState(0);
 	
+	// Check URL parameters for user/team selection
+	useEffect(() => {
+		const userParam = searchParams.get('user');
+		const teamParam = searchParams.get('team');
+		
+		if (userParam || teamParam) {
+			const username = userParam || teamParam;
+			setSelectedSwimmerFromUrl(username);
+			
+			// Find the swimmer and select them
+			const swimmer = tracks.find(t => t.id === username);
+			if (swimmer) {
+				setSelectedSwimmer(swimmer);
+				setShowBottomSheet(true);
+				handleMarkerClick(swimmer);
+			}
+		}
+	}, [searchParams, tracks, setSelectedSwimmerFromUrl]);
+
 	// Map instance will be managed by useMap hook inside MapContent component
 
 	// Process swimmer data into drawable tracks
 	const availableSwimmers = useMemo(() => {
-		return tracks.filter(track => track.points.length > 0);
-	}, [tracks]);
+		// Show all swimmers, even if they have no location history
+		console.log("Available swimmers:", tracks.length, "Swimmers data:", swimmers.length);
+		console.log("Raw tracks:", tracks);
+		console.log("Raw swimmers:", swimmers.slice(0, 3)); // Show first 3
+		
+		
+		
+		return tracks;
+	}, [tracks, swimmers]);
 
 	// Calculate swimmer stats
 	const calculateSwimmerStats = useCallback((track: DrawTrack): SwimmerStats => {
@@ -47,36 +85,55 @@ export default function EnhancedSwimTracker() {
 				totalDistance: 0,
 				duration: 0,
 				averagePace: 0,
-				currentLocation: track.current
+				currentLocation: track.current,
+				raceProgress: 0,
+				donationsRanking: 0,
+				swimPositionRanking: 0
 			};
 		}
 
-		// Calculate total distance using Haversine formula
+		// Calculate total distance
 		let totalDistance = 0;
 		for (let i = 1; i < locations.length; i++) {
-			const dist = calculateDistance(
-				locations[i-1].lat, locations[i-1].lon,
-				locations[i].lat, locations[i].lon
-			);
-			totalDistance += dist;
+			const prev = locations[i - 1];
+			const curr = locations[i];
+			totalDistance += calculateDistance(prev.lat, prev.lon, curr.lat, curr.lon);
 		}
 
-		// Calculate duration
-		const sortedLocations = [...locations].sort((a, b) => a.tst - b.tst);
-		const duration = sortedLocations.length > 1 ? 
-			sortedLocations[sortedLocations.length - 1].tst - sortedLocations[0].tst : 0;
+		// Calculate duration and pace
+		const duration = locations.length > 1 ? 
+			(locations[locations.length - 1].tst - locations[0].tst) / 60 : 0; // in minutes
+		const averagePace = duration > 0 ? totalDistance / duration : 0; // meters per minute
 
-		// Calculate average pace (minutes per 100m)
-		const averagePace = duration > 0 && totalDistance > 0 ? 
-			(duration / 60) / (totalDistance / 100) : 0;
+		// Get current swimmer data for race progress
+		const currentSwimmerData = swimmers.find(s => s.username === track.id);
+		const raceProgress = currentSwimmerData ? calculateRaceProgress(currentSwimmerData) : 0;
+
+		// Calculate rankings
+		const donationsRanking = swimmers
+			.filter(s => s.donations_total !== null && s.donations_total !== undefined)
+			.sort((a, b) => (b.donations_total || 0) - (a.donations_total || 0))
+			.findIndex(s => s.username === track.id) + 1;
+
+		const swimPositionRanking = swimmers
+			.filter(s => s.start_time && hasRaceStartedUtil(s.start_time) && s.locations.length > 0)
+			.sort((a, b) => {
+				const aProgress = calculateRaceProgress(a);
+				const bProgress = calculateRaceProgress(b);
+				return bProgress - aProgress;
+			})
+			.findIndex(s => s.username === track.id) + 1;
 
 		return {
 			totalDistance,
 			duration,
 			averagePace,
-			currentLocation: track.current
+			currentLocation: locations[locations.length - 1],
+			raceProgress,
+			donationsRanking: donationsRanking > 0 ? donationsRanking : 0,
+			swimPositionRanking: swimPositionRanking > 0 ? swimPositionRanking : 0
 		};
-	}, [swimmerHistory, swimmers]);
+	}, [swimmers, swimmerHistory]);
 
 	// Haversine distance calculation
 	const calculateDistance = useCallback((lat1: number, lon1: number, lat2: number, lon2: number): number => {
@@ -136,7 +193,8 @@ export default function EnhancedSwimTracker() {
 	const closeBottomSheet = useCallback(() => {
 		setShowBottomSheet(false);
 		setSelectedSwimmer(null);
-	}, []);
+		setSelectedSwimmerFromUrl(null);
+	}, [setSelectedSwimmerFromUrl]);
 
 	// Format duration
 	const formatDuration = useCallback((seconds: number): string => {
@@ -178,28 +236,31 @@ export default function EnhancedSwimTracker() {
 		return selectedSwimmer ? calculateSwimmerStats(selectedSwimmer) : null;
 	}, [selectedSwimmer, calculateSwimmerStats]);
 
-	// Empty state
-	// if (tracks.length === 0 && !isLoading) {
-	// 	return (
-	// 		<div className="flex h-full w-full items-center justify-center bg-background text-foreground">
-	// 			<div className="text-center space-y-4">
-	// 				<div>
-	// 					<p className="text-lg font-semibold">No active swimmers found</p>
-	// 					<p className="text-sm text-gray-600 mt-2">
-	// 						Switch between Solo and Relay tabs or wait for swimmers to become active
-	// 					</p>
-	// 				</div>
-	// 				{fetchSwimmers && (
-	// 					<Button onClick={() => fetchSwimmers(selectedCategory)} variant="outline">
-	// 						Refresh
-	// 					</Button>
-	// 				)}
-	// 			</div>
-	// 		</div>
-	// 	);
-	// }
+	// Get current swimmer data
+	const currentSwimmerData = useMemo(() => {
+		return selectedSwimmer ? swimmers.find(s => s.username === selectedSwimmer.id) : null;
+	}, [selectedSwimmer, swimmers]);
 
-	const fallbackCenter = tracks[0]?.points[0] || { lat: 53.4125, lng: -7.9045 };
+	// Handle share button click
+	const handleShare = useCallback(() => {
+		if (currentSwimmerData) {
+			const shareUrl = `${window.location.origin}${window.location.pathname}?${currentSwimmerData.swim_type === 'relay' ? 'team' : 'user'}=${currentSwimmerData.username}`;
+			if (navigator.share) {
+				navigator.share({
+					title: `${currentSwimmerData.team_name || currentSwimmerData.username} - Castle Swim`,
+					url: shareUrl
+				});
+			} else {
+				navigator.clipboard.writeText(shareUrl);
+				// You could add a toast notification here
+			}
+		}
+	}, [currentSwimmerData]);
+
+	// Map center - use first track's location or fallback to solo start location
+	const fallbackCenter = tracks.length > 0 && tracks[0]?.points.length > 0 
+		? tracks[0].points[0] 
+		: { lat: 53.541085, lng: -8.005591 }; // Solo start location
 
 	return (
 		<div className="h-full w-full relative">
@@ -248,9 +309,9 @@ export default function EnhancedSwimTracker() {
 				<div className="flex h-full w-full items-center justify-center bg-background text-foreground">
 				<div className="text-center space-y-4">
 					<div>
-						<p className="text-lg font-semibold">No active swimmers found</p>
+						<p className="text-lg font-semibold">No swimmers found</p>
 						<p className="text-sm text-gray-600 mt-2">
-							Switch between Solo and Relay tabs or wait for swimmers to become active
+							No swimmers are registered in the system yet
 						</p>
 					</div>
 					{fetchSwimmers && (
@@ -300,7 +361,7 @@ export default function EnhancedSwimTracker() {
 						))
 					)}
 
-					{/* Enhanced Markers */}
+					{/* Enhanced Markers with Profile Pictures */}
 					{selectedSwimmer && swimmerHistory.length > 0 ? (
 						<Fragment key={selectedSwimmer.id}>
 							<AdvancedMarker
@@ -309,13 +370,23 @@ export default function EnhancedSwimTracker() {
 								zIndex={3000}
 							>
 								<div className="relative cursor-pointer">
-									<div className={
-										`relative rounded-full p-3 shadow-lg border-2 transition-all duration-300 hover:scale-110 bg-orange-500 border-orange-300 animate-pulse scale-110`
-									}>
-										<div className="w-4 h-4 bg-white rounded-full"></div>
-										<div className={
-											`absolute inset-0 rounded-full animate-ping bg-orange-400`
-										} style={{ animationDuration: '2s' }}></div>
+									<div className="relative">
+										{/* Profile Picture */}
+										{currentSwimmerData?.avatar ? (
+											<img 
+												src={currentSwimmerData.avatar} 
+												alt={selectedSwimmer.label}
+												className="w-12 h-12 rounded-full border-4 border-orange-300 shadow-lg"
+											/>
+										) : (
+											<div className="w-12 h-12 bg-orange-500 rounded-full border-4 border-orange-300 shadow-lg flex items-center justify-center">
+												<span className="text-white font-bold text-lg">
+													{selectedSwimmer.label.charAt(0).toUpperCase()}
+												</span>
+											</div>
+										)}
+										{/* Pointed bottom */}
+										<div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-orange-300"></div>
 									</div>
 									<div className="absolute -bottom-8 left-1/2 transform -translate-x-1/2 bg-white/90 backdrop-blur px-2 py-1 rounded text-xs font-semibold text-gray-800 whitespace-nowrap shadow-sm">
 										{selectedSwimmer.label}
@@ -324,29 +395,24 @@ export default function EnhancedSwimTracker() {
 							</AdvancedMarker>
 						</Fragment>
 					) : (
-						tracks.map((track, index) => (
-							<Fragment key={track.id}>
-								<AdvancedMarker
-									position={{ lat: track.current.lat, lng: track.current.lon }}
-									onClick={() => handleMarkerClick(track)}
-									zIndex={selectedSwimmer?.id === track.id ? 3000 : 2000}
-								>
-									<div className="relative cursor-pointer">
-										<div className={
-											`relative rounded-full p-3 shadow-lg border-2 transition-all duration-300 hover:scale-110 ${selectedSwimmer?.id === track.id ? "bg-orange-500 border-orange-300 animate-pulse scale-110" : "bg-blue-500 border-blue-300 animate-pulse"}`
-										}>
-											<div className="w-4 h-4 bg-white rounded-full"></div>
-											<div className={
-												`absolute inset-0 rounded-full animate-ping ${selectedSwimmer?.id === track.id ? "bg-orange-400" : "bg-blue-400"}`
-											} style={{ animationDuration: '2s' }}></div>
-										</div>
-										<div className="absolute -bottom-8 left-1/2 transform -translate-x-1/2 bg-white/90 backdrop-blur px-2 py-1 rounded text-xs font-semibold text-gray-800 whitespace-nowrap shadow-sm">
-											{track.label}
-										</div>
-									</div>
-								</AdvancedMarker>
-							</Fragment>
-						))
+						<>
+							{/* Test marker to verify Google Maps is working */}
+							<AdvancedMarker
+								position={{ lat: 53.541085, lng: -8.005591 }}
+								zIndex={1000}
+							>
+								<div className="w-8 h-8 bg-red-500 rounded-full flex items-center justify-center">
+									<span className="text-white text-xs font-bold">T</span>
+								</div>
+							</AdvancedMarker>
+							
+							<MarkerClusterer
+								tracks={availableSwimmers}
+								onMarkerClick={handleMarkerClick}
+								selectedSwimmer={selectedSwimmer}
+								swimmers={swimmers}
+							/>
+						</>
 					)}
 					
 					<MapBoundsUpdater 
@@ -356,7 +422,7 @@ export default function EnhancedSwimTracker() {
 				</Map>
 			</APIProvider>
 
-			{/* Bottom Sheet */}
+			{/* Enhanced Bottom Sheet */}
 			{showBottomSheet && selectedSwimmer && (
 				<div className={
 					`fixed inset-x-0 bottom-0 z-50 bg-white rounded-t-xl shadow-2xl border-t
@@ -367,15 +433,35 @@ export default function EnhancedSwimTracker() {
 						{/* Header */}
 						<div className="flex items-center justify-between mb-4">
 							<div className="flex items-center space-x-3">
-								{/* Profile photo or fallback initial */}
-								<div className="w-12 h-12 bg-blue-500 rounded-full flex items-center justify-center">
-									<span className="text-white font-bold text-lg">
-										{selectedSwimmer.label.charAt(0).toUpperCase()}
-									</span>
-								</div>
+								{/* Profile photo */}
+								{swimmers.find(s => s.username === selectedSwimmer.id)?.avatar ? (
+									<img 
+										src={swimmers.find(s => s.username === selectedSwimmer.id)?.avatar} 
+										alt={selectedSwimmer.label}
+										className="w-12 h-12 rounded-full border-2 border-blue-200"
+									/>
+								) : (
+									<div className="w-12 h-12 bg-blue-500 rounded-full flex items-center justify-center">
+										<span className="text-white font-bold text-lg">
+											{selectedSwimmer.label.charAt(0).toUpperCase()}
+										</span>
+									</div>
+								)}
 								<div>
-									<h3 className="text-lg font-bold text-gray-900">{selectedSwimmer.label}</h3>
-									<p className="text-sm text-gray-500">Live Race Tracker</p>
+									<h3 className="text-lg font-bold text-gray-900">
+										{currentSwimmerData?.swim_type === 'relay' 
+											? currentSwimmerData.team_name || selectedSwimmer.label
+											: `${currentSwimmerData?.first_name || ""} ${currentSwimmerData?.last_name || ""}`.trim() || selectedSwimmer.label
+										}
+									</h3>
+									<p className="text-sm text-gray-500">
+										{currentSwimmerData?.swim_type === 'relay' ? 'Relay Team' : 'Solo Swimmer'}
+									</p>
+									{currentSwimmerData?.location && (
+										<p className="text-xs text-gray-400">
+											📍 {currentSwimmerData.location}
+										</p>
+									)}
 								</div>
 							</div>
 							<Button
@@ -388,12 +474,118 @@ export default function EnhancedSwimTracker() {
 							</Button>
 						</div>
 
-						{/* Mini Map Overlay */}
-						{/* {swimmerHistory.length > 1 && (
-							<div className="mb-4">
-								<MiniMapOverlay path={swimmerHistory} />
+						{/* Rankings and Progress */}
+						{swimmerStats && (
+							<div className="grid grid-cols-2 gap-3 mb-4">
+								<Card className="p-3">
+									<div className="text-center">
+										<div className="flex items-center justify-center mb-1">
+											<Trophy className="w-4 h-4 mr-1 text-yellow-500" />
+											<p className="text-xs text-gray-500">Donations Rank</p>
+										</div>
+										<p className="text-sm font-bold text-yellow-600">
+											#{swimmerStats.donationsRanking || 'N/A'}
+										</p>
+									</div>
+								</Card>
+								<Card className="p-3">
+									<div className="text-center">
+										<div className="flex items-center justify-center mb-1">
+											<MapPin className="w-4 h-4 mr-1 text-blue-500" />
+											<p className="text-xs text-gray-500">Swim Position</p>
+										</div>
+										<p className="text-sm font-bold text-blue-600">
+											{swimmerStats.swimPositionRanking > 0 ? `#${swimmerStats.swimPositionRanking}` : 'N/A'}
+										</p>
+									</div>
+								</Card>
 							</div>
-						)} */}
+						)}
+
+						{/* Race Progress */}
+						{swimmerStats && swimmerStats.raceProgress > 0 && (
+							<Card className="p-4 mb-4">
+								<div className="flex items-center mb-2">
+									<Percent className="w-4 h-4 mr-2 text-green-500" />
+									<span className="text-sm font-semibold text-gray-700">Race Progress</span>
+								</div>
+								<div className="w-full bg-gray-200 rounded-full h-2">
+									<div 
+										className="bg-green-500 h-2 rounded-full transition-all duration-300"
+										style={{ width: `${swimmerStats.raceProgress}%` }}
+									></div>
+								</div>
+								<p className="text-xs text-gray-600 mt-1 text-center">
+									{swimmerStats.raceProgress.toFixed(1)}% completed
+								</p>
+							</Card>
+						)}
+
+						{/* Bio */}
+						{currentSwimmerData?.bio && (
+							<Card className="p-4 mb-4">
+								<h4 className="font-semibold text-gray-900 mb-2">Bio</h4>
+								<p className="text-sm text-gray-700">{currentSwimmerData.bio}</p>
+							</Card>
+						)}
+
+						{/* Race Times */}
+						{(currentSwimmerData?.start_time || currentSwimmerData?.finish_time) && (
+							<Card className="p-4 mb-4">
+								<h4 className="font-semibold text-gray-900 mb-2">Race Times</h4>
+								<div className="space-y-2 text-sm">
+									{currentSwimmerData?.start_time && (
+										<div className="flex justify-between">
+											<span className="text-gray-600">Start Time:</span>
+											<span className="font-medium">{formatEpochStringUtil(currentSwimmerData.start_time, 'datetime')}</span>
+										</div>
+									)}
+									{currentSwimmerData?.finish_time && (
+										<div className="flex justify-between">
+											<span className="text-gray-600">Finish Time:</span>
+											<span className="font-medium">{formatEpochStringUtil(currentSwimmerData.finish_time, 'datetime')}</span>
+										</div>
+									)}
+									{currentSwimmerData?.start_time && !currentSwimmerData?.finish_time && (
+										<div className="flex justify-between">
+											<span className="text-gray-600">Status:</span>
+											<span className={`font-medium ${hasRaceStartedUtil(currentSwimmerData.start_time) ? 'text-green-600' : 'text-yellow-600'}`}>
+												{hasRaceStartedUtil(currentSwimmerData.start_time) ? 'In Progress' : 'Not Started'}
+											</span>
+										</div>
+									)}
+								</div>
+							</Card>
+						)}
+
+						{/* Donate and Share */}
+						<div className="flex items-center justify-between mb-4">
+							<div className="text-sm text-gray-600">
+								<span className="mr-3">Type: {currentSwimmerData?.swim_type === 'relay' ? 'Relay' : 'Solo'}</span>
+								<span>
+									Donations: {typeof currentSwimmerData?.donations_total === 'number' ?
+										`€${(currentSwimmerData.donations_total as number).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'NA'}
+								</span>
+							</div>
+						</div>
+
+						<div className="flex gap-3 mb-4">
+							{currentSwimmerData?.idonate_url ? (
+								<a href={currentSwimmerData.idonate_url} target="_blank" rel="noopener noreferrer" className="flex-1">
+									<Button className="w-full bg-green-600 hover:bg-green-700">Donate now</Button>
+								</a>
+							) : (
+								<Button variant="outline" disabled className="flex-1">Donate now</Button>
+							)}
+							<Button 
+								variant="outline" 
+								onClick={handleShare}
+								className="flex items-center"
+							>
+								<Share2 className="w-4 h-4 mr-2" />
+								Share
+							</Button>
+						</div>
 
 						{/* Stats Cards */}
 						{swimmerStats && (
@@ -408,10 +600,12 @@ export default function EnhancedSwimTracker() {
 								</Card>
 								<Card className="p-3">
 									<div className="text-center">
-										<p className="text-xs text-gray-500 mb-1">Duration</p>
-										<p className="text-sm font-bold text-green-600">
-											{formatDuration(swimmerStats.duration)}
-										</p>
+										<div className="text-center">
+											<p className="text-xs text-gray-500 mb-1">Duration</p>
+											<p className="text-sm font-bold text-green-600">
+												{formatDuration(swimmerStats.duration)}
+											</p>
+										</div>
 									</div>
 								</Card>
 								<Card className="p-3">
@@ -425,68 +619,25 @@ export default function EnhancedSwimTracker() {
 							</div>
 						)}
 
-						{/* Live Stats */}
-						{/* <div className="space-y-3 mb-4">
-							<h4 className="font-semibold text-gray-900 flex items-center">
-								<Activity className="w-4 h-4 mr-2" />
-								Live Stats
-							</h4>
-							<div className="grid grid-cols-2 gap-3 text-sm">
-								<div className="flex items-center justify-between">
-									<span className="text-gray-600">Coordinates:</span>
-									<span className="font-mono text-xs">
-										{selectedSwimmer.current.lat.toFixed(6)}, {selectedSwimmer.current.lon.toFixed(6)}
-									</span>
-								</div>
-								<div className="flex items-center justify-between">
-									<span className="text-gray-600">Last Update:</span>
-									<span className="text-xs">
-										{new Date(selectedSwimmer.current.tst * 1000).toLocaleTimeString()}
-									</span>
-								</div>
-								<div className="flex items-center justify-between">
-									<span className="text-gray-600 flex items-center">
-										<Battery className="w-3 h-3 mr-1" />
-										Battery:
-									</span>
-									<span className={`font-semibold ${getBatteryColor(selectedSwimmer.current.batt)}`}>
-										{selectedSwimmer.current.batt}%
-									</span>
-								</div>
-								<div className="flex items-center justify-between">
-									<span className="text-gray-600 flex items-center">
-										<Signal className="w-3 h-3 mr-1" />
-										Connection:
-									</span>
-									<span className={`font-semibold ${getConnectionColor(selectedSwimmer.current.conn)}`}>
-										{selectedSwimmer.current.conn === "w" ? "Wi-Fi" : "Mobile"}
-									</span>
-								</div>
-								<div className="flex items-center justify-between">
-									<span className="text-gray-600">Accuracy:</span>
-									<span className="font-semibold">{selectedSwimmer.current.acc}m</span>
-								</div>
-								<div className="flex items-center justify-between">
-									<span className="text-gray-600">Altitude:</span>
-									<span className="font-semibold">{selectedSwimmer.current.alt}m</span>
-								</div>
-								
-								{typeof (selectedSwimmer.current as any).stroke_rate !== 'undefined' && (
-									<div className="flex items-center justify-between col-span-2">
-										<span className="text-gray-600">Stroke Rate:</span>
-										<span className="font-semibold">{(selectedSwimmer.current as any).stroke_rate} spm</span>
+						{/* Team details for relay */}
+						{currentSwimmerData?.swim_type === 'relay' && (
+							<div className="mb-4">
+								<h4 className="font-semibold text-gray-900 mb-2">Team</h4>
+								<div className="text-sm text-gray-700">
+									<div className="mb-1">
+										Captain: {currentSwimmerData.team_captain?.first_name} {currentSwimmerData.team_captain?.last_name}
 									</div>
-								)}
-								{Array.isArray((selectedSwimmer.current as any).split_times) && (
-									<div className="flex flex-col col-span-2">
-										<span className="text-gray-600">Split Times:</span>
-										<span className="font-mono text-xs">
-											{(selectedSwimmer.current as any).split_times.join(', ')}
-										</span>
+									<div>
+										Members:
+										<ul className="list-disc pl-5">
+											{(currentSwimmerData.members || []).map((m, i) => (
+												<li key={i}>{m.first_name} {m.last_name}</li>
+											))}
+										</ul>
 									</div>
-								)}
+								</div>
 							</div>
-						</div> */}
+						)}
 
 						{/* Navigation */}
 						{availableSwimmers.length > 1 && (
@@ -496,7 +647,7 @@ export default function EnhancedSwimTracker() {
 									size="sm"
 									onClick={() => navigateSwimmer('prev')}
 									disabled={loadingHistory}
-									className="flex items-center"
+									className="flex items-center bg-"
 								>
 									<ChevronLeft className="w-4 h-4 mr-1" />
 									Previous
@@ -522,7 +673,7 @@ export default function EnhancedSwimTracker() {
 							<div className="flex items-center justify-center py-4">
 								<Loader2 className="w-5 h-5 animate-spin mr-2" />
 								<span className="text-sm text-gray-600">Loading swimmer history...</span>
-							</div>
+								</div>
 						)}
 					</div>
 				</div>
@@ -549,55 +700,4 @@ function MapBoundsUpdater({ swimmerHistory, selectedSwimmer }: {
 	}, [map, selectedSwimmer, swimmerHistory]);
 
 	return null;
-}
-
-// MiniMapOverlay component (add at the end of the file)
-function MiniMapOverlay({ path }: { path: LocationPoint[] }) {
-	const canvasRef = useRef<HTMLCanvasElement>(null);
-	useEffect(() => {
-		if (!canvasRef.current || path.length < 2) return;
-		const canvas = canvasRef.current;
-		const ctx = canvas.getContext("2d");
-		if (!ctx) return;
-		ctx.clearRect(0, 0, canvas.width, canvas.height);
-		// Find bounds
-		const lats = path.map(p => p.lat);
-		const lngs = path.map(p => p.lon);
-		const minLat = Math.min(...lats), maxLat = Math.max(...lats);
-		const minLng = Math.min(...lngs), maxLng = Math.max(...lngs);
-		// Padding
-		const pad = 10;
-		const w = canvas.width - pad * 2;
-		const h = canvas.height - pad * 2;
-		// Draw path
-		ctx.lineWidth = 3;
-		ctx.lineJoin = "round";
-		for (let i = 1; i < path.length; i++) {
-			// Color by time/pace (simple gradient)
-			const t = i / path.length;
-			ctx.strokeStyle = `hsl(${(1-t)*120}, 70%, 50%)`;
-			ctx.beginPath();
-			const x1 = pad + ((path[i-1].lon - minLng) / (maxLng - minLng || 1)) * w;
-			const y1 = pad + h - ((path[i-1].lat - minLat) / (maxLat - minLat || 1)) * h;
-			const x2 = pad + ((path[i].lon - minLng) / (maxLng - minLng || 1)) * w;
-			const y2 = pad + h - ((path[i].lat - minLat) / (maxLat - minLat || 1)) * h;
-			ctx.moveTo(x1, y1);
-			ctx.lineTo(x2, y2);
-			ctx.stroke();
-		}
-		// Draw start/end points
-		ctx.fillStyle = "#22c55e";
-		ctx.beginPath();
-		ctx.arc(pad + ((path[0].lon - minLng) / (maxLng - minLng || 1)) * w, pad + h - ((path[0].lat - minLat) / (maxLat - minLat || 1)) * h, 5, 0, 2 * Math.PI);
-		ctx.fill();
-		ctx.fillStyle = "#ef4444";
-		ctx.beginPath();
-		ctx.arc(pad + ((path[path.length-1].lon - minLng) / (maxLng - minLng || 1)) * w, pad + h - ((path[path.length-1].lat - minLat) / (maxLat - minLat || 1)) * h, 5, 0, 2 * Math.PI);
-		ctx.fill();
-	}, [path]);
-	return (
-		<div className="w-full flex justify-center">
-			<canvas ref={canvasRef} width={220} height={120} className="rounded border shadow" />
-		</div>
-	);
 }

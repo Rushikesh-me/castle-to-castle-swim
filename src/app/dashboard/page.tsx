@@ -7,16 +7,23 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { UpdateProfileSchema } from "@/app/utils/validation";
 import { Button } from "@/app/components/ui/button";
-import { Input } from "@/app/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/app/components/ui/card";
-import { Play, Square, Users, User, LogOut, Settings, Trophy, Activity, AlertCircle, CheckCircle, Map } from "lucide-react";
-import Link from "next/link";
+import { Users, User, LogOut, Settings, Trophy, Activity, AlertCircle, CheckCircle, Upload, RefreshCw } from "lucide-react";
+import { formatEpochString } from "@/app/utils/timeUtils";
+import { SwimmerUser } from "../types";
 
 type UpdateProfileData = {
 	email: string;
 	team_name: string;
 	swim_type: "solo" | "relay";
 	avatar?: string;
+	idonate_url?: string;
+	bio?: string;
+	first_name?: string;
+	last_name?: string;
+	location?: string;
+	start_time?: string;
+	finish_time?: string;
 };
 
 type Swimmer = {
@@ -25,6 +32,24 @@ type Swimmer = {
 	team_name: string;
 	swim_type: string;
 	is_active: boolean;
+	start_time?: string;
+	finish_time?: string;
+	is_disqualified?: boolean;
+	bio?: string;
+	avatar?: string;
+	first_name?: string;
+	last_name?: string;
+	location?: string;
+	members?: Array<{
+		avatar?: string;
+		bio?: string;
+		first_name: string;
+		last_name: string;
+	}>;
+	team_captain?: {
+		first_name: string;
+		last_name: string;
+	};
 };
 
 export default function Dashboard() {
@@ -33,10 +58,10 @@ export default function Dashboard() {
 	const [isLoading, setIsLoading] = useState(false);
 	const [message, setMessage] = useState("");
 	const [messageType, setMessageType] = useState<"success" | "error" | "info">("info");
-
-	useEffect(() => {
-		console.log("session",session);
-	}, [session]);
+	const [uploadingImage, setUploadingImage] = useState(false);
+	const [selectedFile, setSelectedFile] = useState<File | null>(null);
+	const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+	const [updatingSwimmers, setUpdatingSwimmers] = useState<Set<string>>(new Set());
 
 	const {
 		register,
@@ -48,7 +73,7 @@ export default function Dashboard() {
 		resolver: zodResolver(UpdateProfileSchema),
 	});
 
-	const swimType = watch("swim_type");
+
 
 	const fetchSwimmers = useCallback(async () => {
 		try {
@@ -67,42 +92,99 @@ export default function Dashboard() {
 			setValue("team_name", session.user.team_name || "");
 			setValue("swim_type", (session.user.swim_type as "solo" | "relay") || "solo");
 			setValue("avatar", session.user.avatar || "");
+			setValue("idonate_url", (session.user as unknown as { idonate_url?: string })?.idonate_url || "");
+			setValue("bio", (session.user as unknown as { bio?: string })?.bio || "");
+			setValue("first_name", (session.user as unknown as { first_name?: string })?.first_name || "");
+			setValue("last_name", (session.user as unknown as { last_name?: string })?.last_name || "");
+			setValue("location", (session.user as unknown as { location?: string })?.location || "");
+			setValue("start_time", session.user.start_time ? new Date(parseInt(session.user.start_time) * 1000).toISOString().slice(0, 16) : "");
+			setValue("finish_time", session.user.finish_time ? new Date(parseInt(session.user.finish_time) * 1000).toISOString().slice(0, 16) : "");
 		}
-
 		if (session?.user?.is_admin) {
 			fetchSwimmers();
 		}
 	}, [session, setValue, fetchSwimmers]);
 
-	const showMessage = (msg: string, type: "success" | "error" | "info" = "info") => {
+	const showMessage = (msg: string, type: "success" | "error" | "info") => {
 		setMessage(msg);
 		setMessageType(type);
 		setTimeout(() => setMessage(""), 5000);
 	};
 
+	const handleImageUpload = async () => {
+		if (!selectedFile) return;
+
+		setUploadingImage(true);
+		const formData = new FormData();
+		formData.append("image", selectedFile);
+		formData.append("bio", watch("bio") || "");
+
+		try {
+			const response = await fetch("/api/upload", {
+				method: "POST",
+				body: formData,
+			});
+
+			if (response.ok) {
+				const result = await response.json();
+				setValue("avatar", result.avatar);
+				setValue("bio", result.bio);
+				setPreviewUrl(null);
+				setSelectedFile(null);
+				showMessage("Profile picture uploaded successfully!", "success");
+				await update();
+			} else {
+				const error = await response.json();
+				showMessage(error.error || "Failed to upload image", "error");
+			}
+		} catch (error) {
+			console.error("Upload error:", error);
+			showMessage("Failed to upload image", "error");
+		} finally {
+			setUploadingImage(false);
+		}
+	};
+
+	const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+		const file = event.target.files?.[0];
+		if (file) {
+			setSelectedFile(file);
+			const reader = new FileReader();
+			reader.onload = (e) => setPreviewUrl(e.target?.result as string);
+			reader.readAsDataURL(file);
+		}
+	};
+
 	const handleProfileUpdate = async (data: UpdateProfileData) => {
 		setIsLoading(true);
 		setMessage("");
-
 		try {
 			const response = await fetch("/api/profile", {
 				method: "PUT",
 				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify(data),
+				body: JSON.stringify({
+					email: data.email,
+					team_name: data.team_name,
+					swim_type: data.swim_type,
+					avatar: data.avatar,
+					idonate_url: data.idonate_url,
+					bio: data.bio,
+					first_name: data.first_name,
+					last_name: data.last_name,
+					location: data.location,
+					start_time: data.start_time,
+					finish_time: data.finish_time,
+				}),
 			});
 
 			if (response.ok) {
-				const responseData = await response.json();
-				// Update session with new profile data
-				await update({
-					email: responseData.user.email,
-					team_name: responseData.user.team_name,
-					swim_type: responseData.user.swim_type,
-					avatar: responseData.user.avatar,
-				});
-				showMessage("Profile updated successfully", "success");
+				const result = await response.json();
+				showMessage("Profile updated successfully!", "success");
+				// Update the session to reflect changes
+				await update();
 			} else {
-				throw new Error("Failed to update profile");
+				const error = await response.json();
+				showMessage(error.error || "Failed to update profile", "error");
 			}
 		} catch (error) {
 			console.error("Profile update error:", error);
@@ -158,6 +240,36 @@ export default function Dashboard() {
 		} catch (error) {
 			console.error("Swimmer status update error:", error);
 			showMessage("Failed to update swimmer status", "error");
+		}
+	};
+
+	// Admin functions for managing swimmer times and disqualification
+	const updateSwimmerAdminFields = async (username: string, updates: { start_time?: string; finish_time?: string; is_disqualified?: boolean }, swimType: "solo" | "relay") => {
+		setUpdatingSwimmers(prev => new Set(prev).add(username));
+		try {
+			const response = await fetch(`/api/admin?username=${username}`, {
+				method: "PUT",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify(updates),
+			});
+
+			if (response.ok) {
+				showMessage("Swimmer updated successfully", "success");
+				// Refresh swimmers list
+				fetchSwimmers();
+			} else {
+				const error = await response.json();
+				showMessage(error.error || "Failed to update swimmer", "error");
+			}
+		} catch (error) {
+			console.error("Failed to update swimmer:", error);
+			showMessage("Failed to update swimmer", "error");
+		} finally {
+			setUpdatingSwimmers(prev => {
+				const newSet = new Set(prev);
+				newSet.delete(username);
+				return newSet;
+			});
 		}
 	};
 
@@ -269,82 +381,123 @@ export default function Dashboard() {
 						<CardContent className="p-6">
 							{!session.user.is_admin ? (
 								<form onSubmit={handleSubmit(handleProfileUpdate)} className="space-y-6">
-									<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-										<div>
-											<label className="block text-sm font-semibold mb-2 text-gray-700">Email</label>
-											<Input 
-												{...register("email")} 
-												className={`${errors.email ? "border-red-500 focus:border-red-500" : "border-gray-300 focus:border-blue-500"} transition-colors`}
-												placeholder="your@email.com"
-											/>
-											{errors.email && <p className="text-sm text-red-600 mt-1">{errors.email.message}</p>}
-										</div>
-
-										<div>
-											<label className="block text-sm font-semibold mb-2 text-gray-700">Swim Type</label>
-											<select 
-												{...register("swim_type")} 
-												className="w-full h-10 px-3 py-2 rounded-md border border-gray-300 bg-white text-sm focus:border-blue-500 focus:outline-none transition-colors"
-											>
-												<option value="solo">Solo</option>
-												<option value="relay">Relay</option>
-											</select>
-										</div>
+									{/* Email */}
+									<div>
+										<label className="block text-sm font-semibold mb-2 text-gray-700">Email</label>
+										<input
+											type="email"
+											{...register("email", { required: "Email is required" })}
+											className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+										/>
+										{errors.email && <p className="text-red-500 text-sm mt-1">{errors.email.message}</p>}
 									</div>
 
-									{swimType === "relay" && (
+									{/* First Name and Last Name for Solo Swimmers */}
+									{session.user.swim_type === "solo" && (
+										<>
+											<div>
+												<label className="block text-sm font-semibold mb-2 text-gray-700">First Name</label>
+												<input
+													type="text"
+													{...register("first_name")}
+													className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+												/>
+											</div>
+											<div>
+												<label className="block text-sm font-semibold mb-2 text-gray-700">Last Name</label>
+												<input
+													type="text"
+													{...register("last_name")}
+													className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+												/>
+											</div>
+										</>
+									)}
+
+									{/* Team Name for Relay Teams */}
+									{session.user.swim_type === "relay" && (
 										<div>
 											<label className="block text-sm font-semibold mb-2 text-gray-700">Team Name</label>
-											<Input 
-												{...register("team_name")} 
-												className={`${errors.team_name ? "border-red-500 focus:border-red-500" : "border-gray-300 focus:border-blue-500"} transition-colors`}
-												placeholder="Enter your team name"
+											<input
+												type="text"
+												{...register("team_name", { required: "Team name is required" })}
+												className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
 											/>
-											{errors.team_name && <p className="text-sm text-red-600 mt-1">{errors.team_name.message}</p>}
+											{errors.team_name && <p className="text-red-500 text-sm mt-1">{errors.team_name.message}</p>}
 										</div>
 									)}
 
+									{/* Location */}
 									<div>
-										<label className="block text-sm font-semibold mb-2 text-gray-700">Avatar URL</label>
-										<Input 
-											{...register("avatar")} 
-											className="border-gray-300 focus:border-blue-500 transition-colors"
-											placeholder="https://example.com/avatar.jpg"
+										<label className="block text-sm font-semibold mb-2 text-gray-700">Location</label>
+										<input
+											type="text"
+											{...register("location")}
+											placeholder="e.g., Athlone, Dublin, Cork"
+											className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
 										/>
 									</div>
 
-									<div className="flex flex-col sm:flex-row gap-4 pt-4">
-										<Button 
-											type="submit" 
-											disabled={isLoading}
-											className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
+									{/* Swim Type */}
+									<div>
+										<label className="block text-sm font-semibold mb-2 text-gray-700">Swim Type</label>
+										<select
+											{...register("swim_type", { required: "Swim type is required" })}
+											className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
 										>
-											{isLoading ? "Updating..." : "Update Profile"}
-										</Button>
-
-										<Button 
-											type="button" 
-											variant={session.user.is_active ? "destructive" : "default"} 
-											onClick={toggleRaceStatus} 
-											disabled={isLoading}
-											className={`flex-1 ${session.user.is_active 
-												? "bg-red-600 hover:bg-red-700" 
-												: "bg-green-600 hover:bg-green-700"
-											} disabled:opacity-50`}
-										>
-											{session.user.is_active ? (
-												<>
-													<Square className="w-4 h-4 mr-2" />
-													Stop Race
-												</>
-											) : (
-												<>
-													<Play className="w-4 h-4 mr-2" />
-													Start Race
-												</>
-											)}
-										</Button>
+											<option value="solo">Solo</option>
+											<option value="relay">Relay</option>
+										</select>
+										{errors.swim_type && <p className="text-red-500 text-sm mt-1">{errors.swim_type.message}</p>}
 									</div>
+
+									{/* iDonate URL */}
+									<div>
+										<label className="block text-sm font-semibold mb-2 text-gray-700">iDonate URL</label>
+										<input
+											type="url"
+											{...register("idonate_url")}
+											placeholder="https://www.idonate.ie/fundraiser/..."
+											className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+										/>
+									</div>
+
+									{/* Bio */}
+									<div>
+										<label className="block text-sm font-semibold mb-2 text-gray-700">Bio</label>
+										<textarea
+											{...register("bio")}
+											rows={3}
+											placeholder="Tell us about yourself or your team..."
+											className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+										/>
+									</div>
+
+									{/* Start Time and Finish Time */}
+									<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+										<div>
+											<label className="block text-sm font-semibold mb-2 text-gray-700">Start Time</label>
+											<input
+												type="datetime-local"
+												{...register("start_time")}
+												className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+											/>
+											<p className="text-xs text-gray-500 mt-1">When your race will start</p>
+										</div>
+										<div>
+											<label className="block text-sm font-semibold mb-2 text-gray-700">Finish Time</label>
+											<input
+												type="datetime-local"
+												{...register("finish_time")}
+												className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+											/>
+											<p className="text-xs text-gray-500 mt-1">When you expect to finish (optional)</p>
+										</div>
+									</div>
+
+									<Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700">
+										Update Profile
+									</Button>
 								</form>
 							) : (
 								<div className="text-center py-8">
@@ -356,8 +509,81 @@ export default function Dashboard() {
 						</CardContent>
 					</Card>
 
+					{/* Profile Picture Upload */}
+					{!session.user.is_admin && (
+						<Card className="shadow-xl border-0 bg-white/80 backdrop-blur-sm">
+							<CardHeader className="bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-t-lg">
+								<CardTitle className="flex items-center">
+									<Upload className="w-5 h-5 mr-2" />
+									Profile Picture
+								</CardTitle>
+							</CardHeader>
+							<CardContent className="p-6">
+								<div className="space-y-4">
+									{/* Current Profile Picture */}
+									<div className="text-center">
+										{session.user.avatar ? (
+											<img 
+												src={session.user.avatar} 
+												alt="Profile" 
+												className="w-24 h-24 rounded-full mx-auto border-4 border-purple-200"
+											/>
+										) : (
+											<div className="w-24 h-24 bg-purple-200 rounded-full mx-auto flex items-center justify-center">
+												<User className="w-12 h-12 text-purple-600" />
+											</div>
+										)}
+									</div>
 
-					{/* add a card to show configuration data for owntracks app which swimmer can copy and paste to their app */}
+									{/* File Upload */}
+									<div>
+										<label className="block text-sm font-semibold mb-2 text-gray-700">Upload New Picture</label>
+										<input
+											type="file"
+											accept="image/*"
+											onChange={handleFileSelect}
+											className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100"
+										/>
+									</div>
+
+									{/* Preview */}
+									{previewUrl && (
+										<div className="text-center">
+											<p className="text-sm text-gray-600 mb-2">Preview:</p>
+											<img 
+												src={previewUrl} 
+												alt="Preview" 
+												className="w-20 h-20 rounded-full mx-auto border-2 border-purple-300"
+											/>
+										</div>
+									)}
+
+									{/* Upload Button */}
+									{selectedFile && (
+										<Button 
+											onClick={handleImageUpload}
+											disabled={uploadingImage}
+											className="w-full bg-purple-600 hover:bg-purple-700 disabled:opacity-50"
+										>
+											{uploadingImage ? (
+												<>
+													<div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+													Uploading...
+												</>
+											) : (
+												<>
+													<Upload className="w-4 h-4 mr-2" />
+													Upload Picture
+												</>
+											)}
+										</Button>
+									)}
+								</div>
+							</CardContent>
+						</Card>
+					)}
+
+					{/* OwnTracks Configuration */}
 					<Card className="shadow-xl border-0 bg-white/80 backdrop-blur-sm">
 						<CardHeader className="bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-t-lg">
 							<CardTitle className="flex items-center">
@@ -369,94 +595,217 @@ export default function Dashboard() {
 							<div className="text-center py-8">
 								<p className="text-gray-600">Copy and paste the following configuration data into your OwnTracks app:</p>
 							</div>
-							{/* show blocks with a copy button for url, username and password */}
 							<div className="flex flex-col gap-4">
-								<h3 className="text-md text-gray-900 mt-2">
-									URL
-								</h3>
+								<h3 className="text-md text-gray-900 mt-2">URL</h3>
 								<div className="flex items-center gap-2">
 									<p className="text-gray-600 text-sm w-full bg-gray-50 p-2 rounded-lg border border-gray-200">
-									{"https://0bw7uu6i21.execute-api.eu-west-1.amazonaws.com/location"}
+									{session.user.swim_type === "solo" ? "https://0bw7uu6i21.execute-api.eu-west-1.amazonaws.com/location" : "https://0bw7uu6i21.execute-api.eu-west-1.amazonaws.com/location?is_team=true"}
 									</p>
-									<Button variant="outline">Copy</Button>
+									<Button variant="outline" onClick={() => navigator.clipboard.writeText(session.user.swim_type === "solo" ? "https://0bw7uu6i21.execute-api.eu-west-1.amazonaws.com/location" : "https://0bw7uu6i21.execute-api.eu-west-1.amazonaws.com/location?is_team=true")}>Copy</Button>
 								</div>
-								<h3 className="text-md text-gray-900 mt-2">
-									Username
-								</h3>
+								<h3 className="text-md text-gray-900 mt-2">Username</h3>
 								<div className="flex items-center gap-2">
 									<p className="text-gray-600 text-sm w-full bg-gray-50 p-2 rounded-lg border border-gray-200">
-										{session.user.name}
+										{session.user.swim_type === "solo" ? session.user.name : session.user.team_name}
 									</p>
-									<Button variant="outline">Copy</Button>
+									<Button variant="outline" onClick={() => navigator.clipboard.writeText(session.user.swim_type === "solo" ? (session.user.name||"") : (session.user.team_name||""))}>Copy</Button>
 								</div>
 							</div>
-							
-							
 						</CardContent>
 					</Card>
 
-					{/* Swimmers List (Admin only) */}
+					{/* Swimmers Management (Admin Only) */}
 					{session.user.is_admin && (
 						<Card className="shadow-xl border-0 bg-white/80 backdrop-blur-sm">
-							<CardHeader className="bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-t-lg">
-								<CardTitle className="flex items-center">
-									<Users className="w-5 h-5 mr-2" />
-									Swimmers Management
-								</CardTitle>
+							<CardHeader className="pb-3">
+								<div className="flex items-center justify-between">
+									<div>
+										<h3 className="text-lg font-semibold text-gray-900">Swimmers Management</h3>
+										<p className="text-sm text-gray-600">Manage all registered swimmers and relay teams</p>
+									</div>
+									<Button onClick={fetchSwimmers} disabled={isLoading} className="bg-blue-600 hover:bg-blue-700">
+										<RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+										Refresh
+									</Button>
+								</div>
 							</CardHeader>
 							<CardContent className="p-6">
-								<div className="space-y-4 max-h-96 overflow-y-auto">
+								<div className="space-y-4">
 									{swimmers.map((swimmer) => (
-										<div 
-											key={swimmer.username} 
-											className={`flex items-center justify-between p-4 rounded-lg border transition-all hover:shadow-md ${
-												swimmer.is_active 
-													? "bg-green-50 border-green-200" 
-													: "bg-gray-50 border-gray-200"
-											}`}
-										>
-											<div className="flex-1">
+										<div key={swimmer.username} className="border border-gray-200 rounded-lg p-4 bg-white">
+											<div className="flex items-center justify-between mb-3">
+												<div>
+													<h4 className="font-semibold text-gray-900">
+														{swimmer.swim_type === "solo" 
+															? `${swimmer.first_name || ""} ${swimmer.last_name || ""}`.trim() || swimmer.username
+															: swimmer.team_name || swimmer.username
+														}
+													</h4>
+													<p className="text-sm text-gray-600">
+														{swimmer.swim_type === "solo" ? "Solo Swimmer" : "Relay Team"}
+														{swimmer.location && ` • ${swimmer.location}`}
+													</p>
+													<p className="text-xs text-gray-500">@{swimmer.username}</p>
+												</div>
 												<div className="flex items-center space-x-2">
-													<div className={`w-2 h-2 rounded-full ${
-														swimmer.is_active ? "bg-green-500" : "bg-gray-400"
-													}`}></div>
-													<div className="font-semibold text-gray-900">{swimmer.username}</div>
+													{swimmer.is_disqualified ? (
+														<span className="px-2 py-1 bg-red-100 text-red-800 text-xs rounded-full">
+															Disqualified
+														</span>
+													) : (
+														<span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">
+															Active
+														</span>
+													)}
 												</div>
-												<div className="text-sm text-gray-600 mt-1">
-													{swimmer.team_name} • {swimmer.swim_type}
-												</div>
-												<div className="text-xs text-gray-500">{swimmer.email}</div>
 											</div>
-											<Button 
-												size="sm" 
-												variant={swimmer.is_active ? "destructive" : "default"} 
-												onClick={() => toggleSwimmerStatus(swimmer.username, swimmer.is_active)}
-												className={`ml-4 ${
-													swimmer.is_active 
-														? "bg-red-600 hover:bg-red-700" 
-														: "bg-green-600 hover:bg-green-700"
-												}`}
-											>
-												{swimmer.is_active ? (
-													<>
-														<Square className="w-4 h-4 mr-1" />
-														Stop
-													</>
-												) : (
-													<>
-														<Play className="w-4 h-4 mr-1" />
-														Start
-													</>
-												)}
-											</Button>
+											
+											{/* Current Times Display */}
+											<div className="mb-3 p-3 bg-gray-50 rounded-lg">
+												<div className="grid grid-cols-2 gap-4 text-xs">
+													<div>
+														<span className="font-medium text-gray-700">Current Start Time:</span>
+														<div className="text-gray-600 mt-1">
+															{swimmer.start_time && /^\d{9,10}$/.test(swimmer.start_time) ? (
+																formatEpochString(swimmer.start_time, 'datetime')
+															) : (
+																<span className="text-gray-400">Not set</span>
+															)}
+														</div>
+													</div>
+													<div>
+														<span className="font-medium text-gray-700">Current Finish Time:</span>
+														<div className="text-gray-600 mt-1">
+															{swimmer.finish_time && /^\d{9,10}$/.test(swimmer.finish_time) ? (
+																formatEpochString(swimmer.finish_time, 'datetime')
+															) : (
+																<span className="text-gray-400">Not set</span>
+															)}
+														</div>
+													</div>
+												</div>
+											</div>
+
+											{/* Relay Team Members */}
+											{swimmer.swim_type === "relay" && swimmer.members && swimmer.members.length > 0 && (
+												<div className="mb-3">
+													<p className="text-xs text-gray-600 mb-1">Team Members:</p>
+													<div className="flex flex-wrap gap-2">
+														{swimmer.members.map((member, index) => (
+															<span key={index} className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">
+																{member.first_name} {member.last_name}
+															</span>
+														))}
+													</div>
+													{swimmer.team_captain && (
+														<p className="text-xs text-gray-500 mt-1">
+															Captain: {swimmer.team_captain.first_name} {swimmer.team_captain.last_name}
+														</p>
+													)}
+												</div>
+											)}
+
+											{/* Admin Controls Form */}
+											<form onSubmit={async (e) => {
+												e.preventDefault();
+												const formData = new FormData(e.currentTarget);
+												const startTime = formData.get('start_time') as string;
+												const finishTime = formData.get('finish_time') as string;
+												
+												console.log("📝 Form submitted:", { startTime, finishTime });
+												console.log("📝 Form data entries:");
+												for (const [key, value] of formData.entries()) {
+													console.log(`  ${key}: ${value}`);
+												}
+												
+												const updates: Partial<SwimmerUser> = {};
+												if (startTime) {
+													updates.start_time = startTime; // Send ISO string to API
+													console.log("📝 Start time update:", startTime);
+												}
+												if (finishTime) {
+													updates.finish_time = finishTime; // Send ISO string to API
+													console.log("📝 Finish time update:", finishTime);
+												}
+												
+												if (Object.keys(updates).length > 0) {
+													console.log("📝 Sending updates to API:", updates);
+													updateSwimmerAdminFields(swimmer.username, updates, swimmer.swim_type as "solo" | "relay");
+												} else {
+													console.log("⚠️ No updates to send");
+												}
+											}} className="space-y-3">
+												<div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
+													<div>
+														<label className="block text-xs font-medium text-gray-700 mb-1">Start Time</label>
+														<input
+															name="start_time"
+															type="datetime-local"
+															defaultValue={(typeof swimmer.start_time === "string") &&
+																/^\d{9,10}$/.test(swimmer.start_time) &&
+																Number(swimmer.start_time) >= 946684800 &&
+																Number(swimmer.start_time) <= 4102444800
+																  ? new Date(Number(swimmer.start_time) * 1000).toISOString().slice(0, 16)
+																  : ""}
+															className="w-full px-2 py-1 text-xs border border-gray-300 rounded"
+															disabled={updatingSwimmers.has(swimmer.username)}
+															onChange={(e) => console.log("📝 Start time changed:", e.target.value)}
+														/>
+													</div>
+													<div>
+														<label className="block text-xs font-medium text-gray-700 mb-1">Finish Time</label>
+														<input
+															name="finish_time"
+															type="datetime-local"
+															defaultValue={(typeof swimmer.finish_time === "string") &&
+																/^\d{9,10}$/.test(swimmer.finish_time) &&
+																Number(swimmer.finish_time) >= 946684800 &&
+																Number(swimmer.finish_time) <= 4102444800
+																  ? new Date(Number(swimmer.finish_time) * 1000).toISOString().slice(0, 16)
+																  : ""}
+															className="w-full px-2 py-1 text-xs border border-gray-300 rounded"
+															disabled={updatingSwimmers.has(swimmer.username)}
+															onChange={(e) => console.log("📝 Finish time changed:", e.target.value)}
+														/>
+													</div>
+													<div className="flex flex-col space-y-2">
+														<label className="block text-xs font-medium text-gray-700 mb-1">Actions</label>
+														<div className="flex space-x-2">
+															<Button
+																type="submit"
+																size="sm"
+																className="flex-1 bg-blue-600 hover:bg-blue-700 text-xs"
+																disabled={updatingSwimmers.has(swimmer.username)}
+															>
+																{updatingSwimmers.has(swimmer.username) ? (
+																	<>
+																		<div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white mr-1"></div>
+																		Saving...
+																	</>
+																) : (
+																	"Save Times"
+																)}
+															</Button>
+															<Button
+																type="button"
+																onClick={() => updateSwimmerAdminFields(swimmer.username, { is_disqualified: !swimmer.is_disqualified }, swimmer.swim_type as "solo" | "relay")}
+																variant={swimmer.is_disqualified ? "default" : "destructive"}
+																size="sm"
+																className="flex-1 text-xs"
+																disabled={updatingSwimmers.has(swimmer.username)}
+															>
+																{updatingSwimmers.has(swimmer.username) ? (
+																	<div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white mr-1"></div>
+																) : (
+																	swimmer.is_disqualified ? "Reinstate" : "Disqualify"
+																)}
+															</Button>
+														</div>
+													</div>
+												</div>
+											</form>
 										</div>
 									))}
-									{swimmers.length === 0 && (
-										<div className="text-center py-12">
-											<Users className="w-12 h-12 mx-auto text-gray-400 mb-4" />
-											<p className="text-gray-500">No swimmers found</p>
-										</div>
-									)}
 								</div>
 							</CardContent>
 						</Card>

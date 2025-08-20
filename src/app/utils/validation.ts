@@ -14,6 +14,7 @@ export const SignUpSchema = z
 		team_name: z.string(),
 		swim_type: z.enum(["solo", "relay"]),
 		avatar: z.string().optional(),
+		idonate_url: z.string().url().optional(),
 	})
 	.refine((data) => data.password === data.confirmPassword, {
 		message: "Passwords don't match",
@@ -30,4 +31,11 @@ export const UpdateProfileSchema = z.object({
 	team_name: z.string(),
 	swim_type: z.enum(["solo", "relay"]),
 	avatar: z.string().optional(),
+	idonate_url: z.string().url().optional(),
+	bio: z.string().max(500, "Bio must be less than 500 characters").optional(),
+	first_name: z.string().max(50, "First name must be less than 50 characters").optional(),
+	last_name: z.string().max(50, "Last name must be less than 50 characters").optional(),
+	location: z.string().max(100, "Location must be less than 100 characters").optional(),
+	start_time: z.string().optional(), // ISO datetime string
+	finish_time: z.string().optional(), // ISO datetime string
 });

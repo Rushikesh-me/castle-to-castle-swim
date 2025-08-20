@@ -50,24 +50,26 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 				const { username, password } = validatedFields.data;
 
 				try {
-					// Get user from DynamoDB
-					const result = await client.get({
+					// Get user from DynamoDB; try USER then TEAM namespace
+					const resultUser = await client.get({
 						TableName: process.env.USERS_TABLE_NAME || "swimmers",
-						Key: {
-							pk: `USER`,
-							sk: username,
-						},
+						Key: { pk: `USER`, sk: username },
 					});
-					if (!result.Item) {
+					const resultTeam = resultUser.Item
+						? null
+						: await client.get({
+							TableName: process.env.USERS_TABLE_NAME || "swimmers",
+							Key: { pk: `TEAM`, sk: username },
+						});
+					const user = (resultUser.Item || resultTeam?.Item) as SwimmerUser | undefined;
+					if (!user) {
 						return null;
 					}
-
-					const user = result.Item as SwimmerUser;
 
 					// Verify password
 					const hashedPassword = createHmac('sha256', process.env.SECRET_KEY || "")
 					.update(password)
-					.digest('hex'); // bcrypt.compare(password, user.password);
+					.digest('hex');
 					
 					if (hashedPassword !== user.password) {
 						return null;
@@ -82,6 +84,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 						team_name: user.team_name || "",
 						swim_type: user.swim_type,
 						avatar: user.avatar || "",
+						idonate_url: (user as Partial<SwimmerUser>).idonate_url || "",
+						bio: (user as Partial<SwimmerUser>).bio || "",
 					};
 				} catch (error) {
 					console.error("Authentication error:", error);
@@ -98,25 +102,33 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 				token.team_name = user.team_name;
 				token.swim_type = user.swim_type;
 				token.avatar = user.avatar;
+				token.idonate_url = (user as Partial<SwimmerUser>).idonate_url || "";
+				token.bio = (user as Partial<SwimmerUser>).bio || "";
 			}
 			
 			// Handle session updates
 			if (trigger === "update" && session) {
 				// Update token with session data
-				if (session.is_active !== undefined) {
-					token.is_active = session.is_active;
+				if ((session as Partial<SwimmerUser>).is_active !== undefined) {
+					token.is_active = (session as Partial<SwimmerUser>).is_active as boolean;
 				}
-				if (session.email !== undefined) {
-					token.email = session.email;
+				if ((session as Partial<SwimmerUser>).email !== undefined) {
+					token.email = (session as Partial<SwimmerUser>).email as string;
 				}
-				if (session.team_name !== undefined) {
-					token.team_name = session.team_name;
+				if ((session as Partial<SwimmerUser>).team_name !== undefined) {
+					token.team_name = (session as Partial<SwimmerUser>).team_name as string;
 				}
-				if (session.swim_type !== undefined) {
-					token.swim_type = session.swim_type;
+				if ((session as Partial<SwimmerUser>).swim_type !== undefined) {
+					token.swim_type = (session as Partial<SwimmerUser>).swim_type as string;
 				}
-				if (session.avatar !== undefined) {
-					token.avatar = session.avatar;
+				if ((session as Partial<SwimmerUser>).avatar !== undefined) {
+					token.avatar = (session as Partial<SwimmerUser>).avatar as string;
+				}
+				if ((session as Partial<SwimmerUser>).idonate_url !== undefined) {
+					token.idonate_url = (session as Partial<SwimmerUser>).idonate_url as string;
+				}
+				if ((session as Partial<SwimmerUser>).bio !== undefined) {
+					token.bio = (session as Partial<SwimmerUser>).bio as string;
 				}
 			}
 			
@@ -129,6 +141,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 			session.user.team_name = token.team_name as string;
 			session.user.swim_type = token.swim_type as string;
 			session.user.avatar = token.avatar as string;
+			(session.user as Partial<SwimmerUser>).idonate_url = (token as Partial<SwimmerUser>).idonate_url as string;
+			(session.user as Partial<SwimmerUser>).bio = (token as Partial<SwimmerUser>).bio as string;
 			return session;
 		},
 	},
