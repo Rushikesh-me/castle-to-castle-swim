@@ -709,23 +709,38 @@ export default function Dashboard() {
 											<form onSubmit={async (e) => {
 												e.preventDefault();
 												const formData = new FormData(e.currentTarget);
-												const startTime = formData.get('start_time') as string;
-												const finishTime = formData.get('finish_time') as string;
 												
-												console.log("📝 Form submitted:", { startTime, finishTime });
-												console.log("📝 Form data entries:");
-												for (const [key, value] of formData.entries()) {
-													console.log(`  ${key}: ${value}`);
-												}
+												// Get start time components
+												const startDate = formData.get('start_time_date') as string;
+												const startHour = parseInt(formData.get('start_time_hour') as string) || 0;
+												const startMinute = parseInt(formData.get('start_time_minute') as string) || 0;
+												const startSecond = parseInt(formData.get('start_time_second') as string) || 0;
+												
+												// Get finish time components
+												const finishDate = formData.get('finish_time_date') as string;
+												const finishHour = parseInt(formData.get('finish_time_hour') as string) || 0;
+												const finishMinute = parseInt(formData.get('finish_time_minute') as string) || 0;
+												const finishSecond = parseInt(formData.get('finish_time_second') as string) || 0;
+												
+												console.log("📝 Form submitted:", { 
+													startDate, startHour, startMinute, startSecond,
+													finishDate, finishHour, finishMinute, finishSecond
+												});
 												
 												const updates: Partial<SwimmerUser> = {};
-												if (startTime) {
-													updates.start_time = startTime; // Send ISO string to API
-													console.log("📝 Start time update:", startTime);
+												
+												// Build start time ISO string if date is provided
+												if (startDate) {
+													const startDateTime = new Date(`${startDate}T${startHour.toString().padStart(2, '0')}:${startMinute.toString().padStart(2, '0')}:${startSecond.toString().padStart(2, '0')}`);
+													updates.start_time = startDateTime.toISOString();
+													console.log("📝 Start time update:", updates.start_time);
 												}
-												if (finishTime) {
-													updates.finish_time = finishTime; // Send ISO string to API
-													console.log("📝 Finish time update:", finishTime);
+												
+												// Build finish time ISO string if date is provided
+												if (finishDate) {
+													const finishDateTime = new Date(`${finishDate}T${finishHour.toString().padStart(2, '0')}:${finishMinute.toString().padStart(2, '0')}:${finishSecond.toString().padStart(2, '0')}`);
+													updates.finish_time = finishDateTime.toISOString();
+													console.log("📝 Finish time update:", updates.finish_time);
 												}
 												
 												if (Object.keys(updates).length > 0) {
@@ -735,42 +750,140 @@ export default function Dashboard() {
 													console.log("⚠️ No updates to send");
 												}
 											}} className="space-y-3">
-												<div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
+												<div className="flex flex-col md:flex-row gap-3 text-sm">
+													<div className="flex flex-col space-y-2">
 													<div>
 														<label className="block text-xs font-medium text-gray-700 mb-1">Start Time</label>
-														<input
-															name="start_time"
-															type="datetime-local"
-															defaultValue={(typeof swimmer.start_time === "string") &&
-																/^\d{9,10}$/.test(swimmer.start_time) &&
-																Number(swimmer.start_time) >= 946684800 &&
-																Number(swimmer.start_time) <= 4102444800
-																  ? new Date(Number(swimmer.start_time) * 1000).toISOString().slice(0, 16)
-																  : ""}
-															className="w-full px-2 py-1 text-xs border border-gray-300 rounded"
-															disabled={updatingSwimmers.has(swimmer.username)}
-															onChange={(e) => console.log("📝 Start time changed:", e.target.value)}
-														/>
+														<div className="flex space-x-1">
+															<input
+																name="start_time_date"
+																type="date"
+																defaultValue={(typeof swimmer.start_time === "string") &&
+																	/^\d{9,10}$/.test(swimmer.start_time) &&
+																	Number(swimmer.start_time) >= 946684800 &&
+																	Number(swimmer.start_time) <= 4102444800
+																	  ? new Date(Number(swimmer.start_time) * 1000).toISOString().split('T')[0]
+																	  : ""}
+																className="flex-1 px-2 py-1 text-xs border border-gray-300 rounded"
+																disabled={updatingSwimmers.has(swimmer.username)}
+															/>
+															<input
+																name="start_time_hour"
+																type="number"
+																min="0"
+																max="23"
+																placeholder="HH"
+																defaultValue={(typeof swimmer.start_time === "string") &&
+																	/^\d{9,10}$/.test(swimmer.start_time) &&
+																	Number(swimmer.start_time) >= 946684800 &&
+																	Number(swimmer.start_time) <= 4102444800
+																	  ? new Date(Number(swimmer.start_time) * 1000).getHours()
+																	  : ""}
+																className="w-16 px-2 py-1 text-xs border border-gray-300 rounded text-center"
+																disabled={updatingSwimmers.has(swimmer.username)}
+															/>
+															<span className="text-xs text-gray-500 self-center">:</span>
+															<input
+																name="start_time_minute"
+																type="number"
+																min="0"
+																max="59"
+																placeholder="MM"
+																defaultValue={(typeof swimmer.start_time === "string") &&
+																	/^\d{9,10}$/.test(swimmer.start_time) &&
+																	Number(swimmer.start_time) >= 946684800 &&
+																	Number(swimmer.start_time) <= 4102444800
+																	  ? new Date(Number(swimmer.start_time) * 1000).getMinutes()
+																	  : ""}
+																className="w-16 px-2 py-1 text-xs border border-gray-300 rounded text-center"
+																disabled={updatingSwimmers.has(swimmer.username)}
+															/>
+															<span className="text-xs text-gray-500 self-center">:</span>
+															<input
+																name="start_time_second"
+																type="number"
+																min="0"
+																max="59"
+																placeholder="SS"
+																defaultValue={(typeof swimmer.start_time === "string") &&
+																	/^\d{9,10}$/.test(swimmer.start_time) &&
+																	Number(swimmer.start_time) >= 946684800 &&
+																	Number(swimmer.start_time) <= 4102444800
+																	  ? new Date(Number(swimmer.start_time) * 1000).getSeconds()
+																	  : ""}
+																className="w-16 px-2 py-1 text-xs border border-gray-300 rounded text-center"
+																disabled={updatingSwimmers.has(swimmer.username)}
+															/>
+														</div>
 													</div>
 													<div>
 														<label className="block text-xs font-medium text-gray-700 mb-1">Finish Time</label>
-														<input
-															name="finish_time"
-															type="datetime-local"
-															defaultValue={(typeof swimmer.finish_time === "string") &&
-																/^\d{9,10}$/.test(swimmer.finish_time) &&
-																Number(swimmer.finish_time) >= 946684800 &&
-																Number(swimmer.finish_time) <= 4102444800
-																  ? new Date(Number(swimmer.finish_time) * 1000).toISOString().slice(0, 16)
-																  : ""}
-															className="w-full px-2 py-1 text-xs border border-gray-300 rounded"
-															disabled={updatingSwimmers.has(swimmer.username)}
-															onChange={(e) => console.log("📝 Finish time changed:", e.target.value)}
-														/>
+														<div className="flex space-x-1">
+															<input
+																name="finish_time_date"
+																type="date"
+																defaultValue={(typeof swimmer.finish_time === "string") &&
+																	/^\d{9,10}$/.test(swimmer.finish_time) &&
+																	Number(swimmer.finish_time) >= 946684800 &&
+																	Number(swimmer.start_time) <= 4102444800
+																	  ? new Date(Number(swimmer.finish_time) * 1000).toISOString().split('T')[0]
+																	  : ""}
+																className="flex-1 px-2 py-1 text-xs border border-gray-300 rounded"
+																disabled={updatingSwimmers.has(swimmer.username)}
+															/>
+															<input
+																name="finish_time_hour"
+																type="number"
+																min="0"
+																max="23"
+																placeholder="HH"
+																defaultValue={(typeof swimmer.finish_time === "string") &&
+																	/^\d{9,10}$/.test(swimmer.finish_time) &&
+																	Number(swimmer.finish_time) >= 946684800 &&
+																	Number(swimmer.finish_time) <= 4102444800
+																	  ? new Date(Number(swimmer.finish_time) * 1000).getHours()
+																	  : ""}
+																className="w-16 px-2 py-1 text-xs border border-gray-300 rounded text-center"
+																disabled={updatingSwimmers.has(swimmer.username)}
+															/>
+															<span className="flex items-center justify-center w-4 text-xs text-gray-500">:</span>
+															<input
+																name="finish_time_minute"
+																type="number"
+																min="0"
+																max="59"
+																placeholder="MM"
+																defaultValue={(typeof swimmer.finish_time === "string") &&
+																	/^\d{9,10}$/.test(swimmer.finish_time) &&
+																	Number(swimmer.finish_time) >= 946684800 &&
+																	Number(swimmer.finish_time) <= 4102444800
+																	  ? new Date(Number(swimmer.finish_time) * 1000).getMinutes()
+																	  : ""}
+																className="w-16 px-2 py-1 text-xs border border-gray-300 rounded text-center"
+																disabled={updatingSwimmers.has(swimmer.username)}
+															/>
+															<span className="flex items-center justify-center w-4 text-xs text-gray-500">:</span>
+															<input
+																name="finish_time_second"
+																type="number"
+																min="0"
+																max="59"
+																placeholder="SS"
+																defaultValue={(typeof swimmer.finish_time === "string") &&
+																	/^\d{9,10}$/.test(swimmer.finish_time) &&
+																	Number(swimmer.finish_time) >= 946684800 &&
+																	Number(swimmer.finish_time) <= 4102444800
+																	  ? new Date(Number(swimmer.finish_time) * 1000).getSeconds()
+																	  : ""}
+																className="w-16 px-2 py-1 text-xs border border-gray-300 rounded text-center"
+																disabled={updatingSwimmers.has(swimmer.username)}
+															/>
+														</div>
+													</div>
 													</div>
 													<div className="flex flex-col space-y-2">
 														<label className="block text-xs font-medium text-gray-700 mb-1">Actions</label>
-														<div className="flex space-x-2">
+														<div className="flex flex-col h-full space-y-2">
 															<Button
 																type="submit"
 																size="sm"
