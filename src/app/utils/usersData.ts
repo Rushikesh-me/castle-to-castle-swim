@@ -75,10 +75,22 @@ export function calculateRaceProgress(swimmer: SwimmerTrack): number {
 export function getMarkerPosition(swimmer: SwimmerTrack): { lat: number; lng: number } {
 	const currentTime = Math.floor(Date.now() / 1000); // Current time in seconds
 	
+	// Helper function to validate coordinates
+	const isValidCoordinate = (lat: number, lng: number): boolean => {
+		return typeof lat === 'number' && 
+			   typeof lng === 'number' && 
+			   !isNaN(lat) && !isNaN(lng) && 
+			   isFinite(lat) && isFinite(lng) &&
+			   lat >= -90 && lat <= 90 && 
+			   lng >= -180 && lng <= 180;
+	};
+	
 	// If swimmer is disqualified, show at last known location
 	if (swimmer.is_disqualified && swimmer.locations.length > 0) {
 		const lastLocation = swimmer.locations[swimmer.locations.length - 1];
-		return { lat: lastLocation.lat, lng: lastLocation.lon };
+		if (isValidCoordinate(lastLocation.lat, lastLocation.lon)) {
+			return { lat: lastLocation.lat, lng: lastLocation.lon };
+		}
 	}
 	
 	// If no start time or race hasn't started, show at start location
@@ -89,7 +101,9 @@ export function getMarkerPosition(swimmer: SwimmerTrack): { lat: number; lng: nu
 	// If race has started and has location history, show at current location
 	if (swimmer.locations.length > 0) {
 		const lastLocation = swimmer.locations[swimmer.locations.length - 1];
-		return { lat: lastLocation.lat, lng: lastLocation.lon };
+		if (isValidCoordinate(lastLocation.lat, lastLocation.lon)) {
+			return { lat: lastLocation.lat, lng: lastLocation.lon };
+		}
 	}
 	
 	// Fallback to start location
@@ -126,6 +140,18 @@ export function extractTracks(swimmers: SwimmerTrack[]): DrawTrack[] {
 		.map((swimmer): DrawTrack | null => {
 			// Get marker position based on swimmer status
 			const markerPosition = getMarkerPosition(swimmer);
+			
+			// Validate marker position coordinates
+			if (!markerPosition || 
+				typeof markerPosition.lat !== 'number' || 
+				typeof markerPosition.lng !== 'number' ||
+				isNaN(markerPosition.lat) || 
+				isNaN(markerPosition.lng) ||
+				!isFinite(markerPosition.lat) || 
+				!isFinite(markerPosition.lng)) {
+				console.warn(`⚠️ Skipping swimmer ${swimmer.username} with invalid marker position:`, markerPosition);
+				return null;
+			}
 			
 			// Create a synthetic current location for the marker
 			// Note: LocationPoint uses 'lon', but we need to convert to 'lng' for Google Maps

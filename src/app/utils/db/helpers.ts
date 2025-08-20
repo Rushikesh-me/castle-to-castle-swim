@@ -124,11 +124,17 @@ export async function batchFetchLocations(usernames: string[], locationLimit: nu
 		const chunkResults = await Promise.allSettled(chunkPromises);
 		chunkResults.forEach((result) => {
 			if (result.status === 'fulfilled') {
-				results.set(result.value.username, result.value.locations);
+				// Transform the raw location data to SwimmerTrack format
+				const swimmerTracks: SwimmerTrack[] = result.value.locations.map(location => ({
+					team_name: "", // Default empty team name for individual locations
+					username: result.value.username,
+					swim_type: "solo", // Default swim type, could be enhanced later
+					locations: [location] // Wrap single location in array
+				}));
+				results.set(result.value.username, swimmerTracks);
 			}
 		});
 	}
-	
 	return results;
 }
 
@@ -163,9 +169,9 @@ export async function getSwimmersFast(swimType?: string): Promise<SwimmerUser[]>
 	const allSwimmers = results.flatMap(r => r.Items || []);
 	
 	// Cache the result
-	swimmersCache.set(cacheKey, { data: allSwimmers, timestamp: Date.now() });
+	swimmersCache.set(cacheKey, { data: allSwimmers as SwimmerUser[], timestamp: Date.now() });
 	
-	return allSwimmers;
+	return allSwimmers as SwimmerUser[];
 }
 
 // Progressive loading: First return basic swimmer data, then enhance with locations and donations
@@ -192,13 +198,13 @@ export async function getActiveSwimmersWithLocations(swimType?: string, location
 	// Step 2: Batch fetch locations and donations in parallel (slower but parallelized)
 	const [locationsMap, donationsMap] = await Promise.all([
 		batchFetchLocations(basicSwimmers.map(s => s.username), locationLimit),
-		batchFetchIdonateTotals(basicSwimmers.map(s => s.idonate_url))
+		batchFetchIdonateTotals(basicSwimmers.map(s => s.idonate_url).filter(url => url !== undefined))
 	]);
 
 	// Step 3: Combine all data
 	const swimmersWithLocations = basicSwimmers.map(swimmer => {
 		const locations = locationsMap.get(swimmer.username) || [];
-		const donations_total = donationsMap.get(swimmer.idonate_url) || null;
+		const donations_total = donationsMap.get(swimmer.idonate_url || "") || null;
 		
 		return {
 			username: swimmer.username,
@@ -223,7 +229,7 @@ export async function getActiveSwimmersWithLocations(swimType?: string, location
 		};
 	});
 
-	return swimmersWithLocations;
+	return swimmersWithLocations as unknown as SwimmerUser[];
 }
 
 export async function createUser(userData: SwimmerUser) {

@@ -46,10 +46,33 @@ export function MarkerClusterer({ tracks, onMarkerClick, selectedSwimmer, swimme
   const createClusters = (tracks: DrawTrack[], zoom: number): Cluster[] => {
     if (tracks.length === 0) return [];
 
+    // Filter out tracks with invalid coordinates
+    const validTracks = tracks.filter(track => {
+      const isValid = track.current && 
+        typeof track.current.lat === 'number' && 
+        typeof track.current.lon === 'number' &&
+        !isNaN(track.current.lat) && 
+        !isNaN(track.current.lon) &&
+        isFinite(track.current.lat) && 
+        isFinite(track.current.lon);
+      
+      if (!isValid) {
+        console.warn(`⚠️ Skipping track ${track.id} with invalid coordinates:`, track.current);
+      }
+      return isValid;
+    });
+
+    if (validTracks.length === 0) {
+      console.log("⚠️ No valid tracks to cluster");
+      return [];
+    }
+
+    console.log(`🔍 Processing ${validTracks.length} valid tracks out of ${tracks.length} total`);
+
     const clusters: Cluster[] = [];
     const clusterRadius = Math.max(50, 1000 / Math.pow(2, zoom)); // Adjust radius based on zoom
 
-    tracks.forEach(track => {
+    validTracks.forEach(track => {
       let addedToCluster = false;
 
       for (const cluster of clusters) {
@@ -132,6 +155,19 @@ export function MarkerClusterer({ tracks, onMarkerClick, selectedSwimmer, swimme
         if (cluster.tracks.length === 1) {
           // Single marker
           const track = cluster.tracks[0];
+          
+          // Additional validation for rendering
+          if (!track.current || 
+              typeof track.current.lat !== 'number' || 
+              typeof track.current.lon !== 'number' ||
+              isNaN(track.current.lat) || 
+              isNaN(track.current.lon) ||
+              !isFinite(track.current.lat) || 
+              !isFinite(track.current.lon)) {
+            console.warn(`⚠️ Skipping invalid marker for track ${track.id}:`, track.current);
+            return null;
+          }
+          
           const swimmerData = swimmers.find(s => s.username === track.id);
           const isSelected = selectedSwimmer?.id === track.id;
           
@@ -177,6 +213,19 @@ export function MarkerClusterer({ tracks, onMarkerClick, selectedSwimmer, swimme
           );
         } else {
           // Clustered markers
+          
+          // Validate cluster center coordinates
+          if (!cluster.center || 
+              typeof cluster.center.lat !== 'number' || 
+              typeof cluster.center.lng !== 'number' ||
+              isNaN(cluster.center.lat) || 
+              isNaN(cluster.center.lng) ||
+              !isFinite(cluster.center.lat) || 
+              !isFinite(cluster.center.lng)) {
+            console.warn(`⚠️ Skipping invalid cluster center:`, cluster.center);
+            return null;
+          }
+          
           console.log(`📍 Rendering cluster with ${cluster.tracks.length} markers at:`, cluster.center);
           
           return (
