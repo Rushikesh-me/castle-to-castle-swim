@@ -270,6 +270,7 @@ export default function EnhancedSwimTracker() {
 							onClick={() => {
 								if(selectedCategory !== "solo") {
 									setSelectedSwimmer(null);
+									setShowBottomSheet(false);
 									setSelectedCategory("solo")
 								}
 							}}
@@ -286,6 +287,7 @@ export default function EnhancedSwimTracker() {
 							onClick={() => {
 								if(selectedCategory !== "relay") {
 									setSelectedSwimmer(null);
+									setShowBottomSheet(false);
 									setSelectedCategory("relay")
 								}
 							}}
@@ -397,7 +399,7 @@ export default function EnhancedSwimTracker() {
 											<img 
 												src={currentSwimmerData.avatar} 
 												alt={selectedSwimmer.label}
-												className="w-12 h-12 rounded-full border-4 border-orange-300 shadow-lg"
+												className="w-12 h-12 rounded-full border-4 border-orange-300 shadow-lg object-cover"
 											/>
 										) : (
 											<div className="w-12 h-12 bg-orange-500 rounded-full border-4 border-orange-300 shadow-lg flex items-center justify-center">
@@ -432,6 +434,7 @@ export default function EnhancedSwimTracker() {
 								onMarkerClick={handleMarkerClick}
 								selectedSwimmer={selectedSwimmer}
 								swimmers={swimmers}
+								selectedCategory={selectedCategory}
 							/>
 						</>
 					)}
@@ -459,7 +462,7 @@ export default function EnhancedSwimTracker() {
 									<img 
 										src={swimmers.find(s => s.username === selectedSwimmer.id)?.avatar} 
 										alt={selectedSwimmer.label}
-										className="w-12 h-12 rounded-full border-2 border-blue-200 flex-shrink-0"
+										className="w-12 h-12 rounded-full border-2 border-blue-200 flex-shrink-0 object-cover"
 									/>
 								) : (
 									<div className="w-12 h-12 bg-blue-500 rounded-full flex items-center justify-center flex-shrink-0">

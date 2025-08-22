@@ -5,6 +5,7 @@ import { Dialog, DialogPanel } from "@headlessui/react";
 import { Bars3Icon, XMarkIcon } from "@heroicons/react/24/outline";
 import Link from "next/link";
 import { Button } from "./button";
+import { AlertTriangle } from "lucide-react";
 
 const NavBar = () => {
 	const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -45,7 +46,16 @@ const NavBar = () => {
 						Leaderboards
 					</Link>
 				</div>
-				<div className="hidden lg:flex lg:flex-1 lg:justify-end">
+				<div className="hidden lg:flex lg:flex-1 lg:justify-end lg:gap-x-4">
+					<Link href="/help">
+						<Button 
+							variant="outline" 
+							className="bg-orange-600 hover:bg-orange-700 text-white font-semibold text-lg hover:text-white"
+						>
+							<AlertTriangle className="w-5 h-5 mr-2" />
+							Need help?
+						</Button>
+					</Link>
 					<Button 
 						variant="outline" 
 						onClick={() => window.open("https://www.idonate.ie/event/castletocastle25", "_blank")} 
@@ -91,6 +101,14 @@ const NavBar = () => {
 										onClick={handleLinkClick}
 									>
 										Leaderboards
+									</Link>
+									<Link 
+										href="/help" 
+										className="block rounded-lg px-3 py-2 text-base font-semibold leading-7 text-orange-600 hover:bg-orange-50"
+										onClick={handleLinkClick}
+									>
+										<AlertTriangle className="w-5 h-5 inline mr-2" />
+										Need help?
 									</Link>
 								</div>
 							</div>

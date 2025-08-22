@@ -8,7 +8,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { UpdateProfileSchema } from "@/app/utils/validation";
 import { Button } from "@/app/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/app/components/ui/card";
-import { Users, User, LogOut, Settings, Trophy, Activity, AlertCircle, CheckCircle, Upload, RefreshCw } from "lucide-react";
+import { Users, User, LogOut, Settings, Trophy, Activity, AlertCircle, CheckCircle, Upload, RefreshCw, AlertTriangle } from "lucide-react";
 import { formatEpochString } from "@/app/utils/timeUtils";
 import { SwimmerUser } from "../types";
 
@@ -52,6 +52,18 @@ type Swimmer = {
 export default function Dashboard() {
 	const { data: session, status, update } = useSession();
 	const [swimmers, setSwimmers] = useState<Swimmer[]>([]);
+	const [emergencies, setEmergencies] = useState<{
+		deviceId: string;
+		username?: string;
+		swimType?: string;
+		teamName?: string;
+		firstName?: string;
+		lastName?: string;
+		location: { lat: number; lng: number };
+		timestamp: string;
+		isSwimmer: boolean;
+		status: 'active' | 'resolved';
+	}[]>([]);
 	const [isLoading, setIsLoading] = useState(false);
 	const [message, setMessage] = useState("");
 	const [messageType, setMessageType] = useState<"success" | "error" | "info">("info");
@@ -74,12 +86,22 @@ export default function Dashboard() {
 
 	const fetchSwimmers = useCallback(async () => {
 		try {
-			const response = await fetch("/api/swimmers");
+			const response = await fetch("/api/swimmers/admin");
 			const data = await response.json();
 			setSwimmers(data);
 		} catch (error) {
 			console.error("Failed to fetch swimmers:", error);
 			showMessage("Failed to fetch swimmers", "error");
+		}
+	}, []);
+
+	const fetchEmergencies = useCallback(async () => {
+		try {
+			const response = await fetch("/api/emergency/admin");
+			const data = await response.json();
+			setEmergencies(data);
+		} catch (error) {
+			console.error("Failed to fetch emergencies:", error);
 		}
 	}, []);
 
@@ -98,8 +120,9 @@ export default function Dashboard() {
 		}
 		if (session?.user?.is_admin) {
 			fetchSwimmers();
+			fetchEmergencies();
 		}
-	}, [session, setValue, fetchSwimmers]);
+	}, [session, setValue, fetchSwimmers, fetchEmergencies]);
 
 	const showMessage = (msg: string, type: "success" | "error" | "info") => {
 		setMessage(msg);
@@ -530,7 +553,7 @@ export default function Dashboard() {
 											<img 
 												src={session.user.avatar} 
 												alt="Profile" 
-												className="w-24 h-24 rounded-full mx-auto border-4 border-purple-200"
+												className="w-24 h-24 rounded-full mx-auto border-4 border-purple-200 object-cover"
 											/>
 										) : (
 											<div className="w-24 h-24 bg-purple-200 rounded-full mx-auto flex items-center justify-center">
@@ -557,7 +580,7 @@ export default function Dashboard() {
 											<img 
 												src={previewUrl} 
 												alt="Preview" 
-												className="w-20 h-20 rounded-full mx-auto border-2 border-purple-300"
+												className="w-20 h-20 rounded-full mx-auto border-2 border-purple-300 object-cover"
 											/>
 										</div>
 									)}
@@ -921,6 +944,100 @@ export default function Dashboard() {
 							</CardContent>
 						</Card>
 					)}
+						{/* Emergencies Management (Admin Only) */}
+						{session.user.is_admin && (
+							<Card className="shadow-xl border-0 bg-white/80 backdrop-blur-sm">
+								<CardHeader className="pb-3">
+									<div className="flex items-center justify-between">
+										<div>
+											<h3 className="text-lg font-semibold text-gray-900">Active Emergencies</h3>
+											<p className="text-sm text-gray-600">Monitor and manage emergency SOS requests</p>
+										</div>
+										<Button onClick={fetchEmergencies} disabled={isLoading} className="bg-red-600 hover:bg-red-700">
+											<RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+											Refresh
+										</Button>
+									</div>
+								</CardHeader>
+								<CardContent className="p-6">
+									{emergencies.length === 0 ? (
+										<div className="text-center py-8 text-gray-500">
+											<AlertTriangle className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+											<p>No active emergencies</p>
+										</div>
+									) : (
+										<div className="space-y-4">
+											{emergencies.map((emergency) => (
+												<div key={emergency.deviceId} className="border border-red-200 rounded-lg p-4 bg-red-50">
+													<div className="flex items-center justify-between mb-3">
+														<div>
+															<h4 className="font-semibold text-red-900">
+																{emergency.isSwimmer 
+																	? emergency.username 
+																		? `${emergency.firstName || ''} ${emergency.lastName || ''}`.trim() || emergency.username
+																		: 'Unknown Swimmer'
+																	: 'Visitor'
+																}
+															</h4>
+															<p className="text-sm text-red-700">
+																{emergency.isSwimmer ? 'Swimmer Emergency' : 'Visitor Emergency'}
+																{emergency.swimType && ` • ${emergency.swimType}`}
+																{emergency.teamName && emergency.teamName !== 'solo' && ` • ${emergency.teamName}`}
+															</p>
+															<p className="text-xs text-red-600">
+																Device ID: {emergency.deviceId}
+															</p>
+														</div>
+														<div className="flex items-center space-x-2">
+															<span className="px-2 py-1 bg-red-100 text-red-800 text-xs rounded-full">
+																Active
+															</span>
+															<Button
+																onClick={async () => {
+																	try {
+																		const response = await fetch('/api/emergency/admin', {
+																			method: 'PUT',
+																			headers: { 'Content-Type': 'application/json' },
+																			body: JSON.stringify({ deviceId: emergency.deviceId, status: 'resolved' }),
+																		});
+																		if (response.ok) {
+																			fetchEmergencies();
+																			showMessage('Emergency resolved successfully', 'success');
+																		}
+																	} catch (error) {
+																		showMessage('Failed to resolve emergency', 'error');
+																	}
+																}}
+																size="sm"
+																className="bg-green-600 hover:bg-green-700 text-xs"
+															>
+																Resolve
+															</Button>
+														</div>
+													</div>
+													
+													<div className="grid grid-cols-2 gap-4 text-xs">
+														<div>
+															<span className="font-medium text-red-700">Location:</span>
+															<div className="text-red-600 mt-1">
+																{emergency.location?.lat?.toFixed(6)}, {emergency.location?.lng?.toFixed(6)}
+															</div>
+														</div>
+														<div>
+															<span className="font-medium text-red-700">Time:</span>
+															<div className="text-red-600 mt-1">
+																{emergency.timestamp ? new Date(emergency.timestamp).toLocaleString() : 'Unknown'}
+															</div>
+														</div>
+													</div>
+												</div>
+											))}
+										</div>
+									)}
+								</CardContent>
+							</Card>
+						)}
+					
 				</div>
 			</div>
 		</div>

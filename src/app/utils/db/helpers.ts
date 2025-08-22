@@ -23,15 +23,28 @@ async function fetchIdonateTotal(idonateUrl?: string): Promise<number | null> {
 		if (cached && Date.now() - cached.timestamp < DONATIONS_CACHE_TTL) {
 			return cached.amount;
 		}
-
-		const { data: html } = await axios.get(idonateUrl, { timeout: 5000 });
+		//wait for js to load
+		const { data: html } = await axios.get(idonateUrl, { timeout: 5000});
 
 		// Load HTML into cheerio for parsing
 		const $ = cheerio.load(html);
 
 		// Select the <p> element with class "text-close-icon false"
+		//if the url contains "team"
 		const amountText = $('p.font-degular-regular.text-base.leading-content-title.tracking-contents.text-form-desc').first().text().trim();
-		if (!amountText) return null;
+		if (!amountText) {			
+			// Try to extract raised amount from the full page text
+			const fullText = $('script').text();
+			const raisedIndex = fullText.match(/"raised\\":\s*(\d+)/)?.index;
+			if(raisedIndex) {
+				//get amount from raised index + 10 to first , found
+				const amount = fullText.substring(raisedIndex + 10, fullText.indexOf(',', raisedIndex + 10));
+				if(amount) {
+					 return parseFloat(amount);
+				}
+			}
+			return null;
+		}
 		
 		// Extract the numeric part from the amount text (e.g., "€950" -> 950)
 		const numericStr = amountText.replace(/[^\d]/g, '');
@@ -39,10 +52,8 @@ async function fetchIdonateTotal(idonateUrl?: string): Promise<number | null> {
 		
 		// Cache the result
 		donationsCache.set(idonateUrl, { amount, timestamp: Date.now() });
-		
 		return amount;
 	} catch (error) {
-
 		return null;
 	}
 }
@@ -152,16 +163,16 @@ export async function getSwimmersFast(swimType?: string): Promise<SwimmerUser[]>
 		queries.push(ddb.send(new QueryCommand({
 			TableName: process.env.USERS_TABLE_NAME!,
 			KeyConditionExpression: "pk = :pk",
-			FilterExpression: "swim_type = :swim_type",
-			ExpressionAttributeValues: { ":pk": "USER", ":swim_type": "solo" },
+			FilterExpression: "swim_type = :swim_type AND is_admin = :is_admin",
+			ExpressionAttributeValues: { ":pk": "USER", ":swim_type": "solo", ":is_admin": false },
 		})));
 	}
 	if (!swimType || swimType === "relay") {
 		queries.push(ddb.send(new QueryCommand({
 			TableName: process.env.USERS_TABLE_NAME!,
 			KeyConditionExpression: "pk = :pk",
-			FilterExpression: "swim_type = :swim_type",
-			ExpressionAttributeValues: { ":pk": "TEAM", ":swim_type": "relay" },
+			FilterExpression: "swim_type = :swim_type AND is_admin = :is_admin",
+			ExpressionAttributeValues: { ":pk": "TEAM", ":swim_type": "relay", ":is_admin": false },
 		})));
 	}
 	
@@ -286,6 +297,26 @@ export async function createUser(userData: SwimmerUser) {
 }
 
 export async function getAllSwimmers() {
+	const [usersResult, teamsResult] = await Promise.all([
+		ddb.send(new QueryCommand({
+			TableName: process.env.USERS_TABLE_NAME!,
+			KeyConditionExpression: "pk = :pk",
+			FilterExpression: "is_admin = :is_admin",
+			ExpressionAttributeValues: { ":pk": "USER", ":is_admin": false },
+		})),
+		ddb.send(new QueryCommand({
+			TableName: process.env.USERS_TABLE_NAME!,
+			KeyConditionExpression: "pk = :pk",
+			FilterExpression: "is_admin = :is_admin",
+			ExpressionAttributeValues: { ":pk": "TEAM", ":is_admin": false },
+		})),
+	]);
+
+	return [...(usersResult.Items || []), ...(teamsResult.Items || [])];
+}
+
+// Function to get ALL swimmers including admins (for admin dashboard use)
+export async function getAllSwimmersIncludingAdmins() {
 	const [usersResult, teamsResult] = await Promise.all([
 		ddb.send(new QueryCommand({
 			TableName: process.env.USERS_TABLE_NAME!,
@@ -545,5 +576,109 @@ export async function getSwimmerCompleteHistory(username: string) {
 	} catch (error) {
 		console.error(`Failed to fetch complete history for swimmer ${username}:`, error);
 		throw error; // Re-throw to let the API route handle it
+	}
+}
+
+// Emergency SOS functions
+export async function createEmergencyRecord(emergencyData: {
+	deviceId: string;
+	username?: string;
+	swimType?: string;
+	teamName?: string;
+	firstName?: string;
+	lastName?: string;
+	location: { lat: number; lng: number };
+	timestamp: string;
+	isSwimmer: boolean;
+	status: 'active' | 'resolved';
+}) {
+	try {
+		await ddb.send(new PutCommand({
+			TableName: 'emergency',
+			Item: {
+				id: emergencyData.deviceId,
+				...emergencyData,
+				created_at: getCurrentEpochString(),
+				updated_at: getCurrentEpochString(),
+			},
+		}));
+		return true;
+	} catch (error) {
+		console.error('Failed to create emergency record:', error);
+		return false;
+	}
+}
+
+export async function updateEmergencyLocation(deviceId: string, location: { lat: number; lng: number }) {
+	try {
+		await ddb.send(new UpdateCommand({
+			TableName: 'emergency',
+			Key: { id: deviceId },
+			UpdateExpression: 'SET #location = :location, updated_at = :updated_at',
+			ExpressionAttributeNames: {
+				'#location': 'location',
+			},
+			ExpressionAttributeValues: {
+				':location': location,
+				':updated_at': getCurrentEpochString(),
+			},
+		}));
+		return true;
+	} catch (error) {
+		console.error('Failed to update emergency location:', error);
+		return false;
+	}
+}
+
+export async function resolveEmergency(deviceId: string) {
+	try {
+		await ddb.send(new UpdateCommand({
+			TableName: 'emergency',
+			Key: { id: deviceId },
+			UpdateExpression: 'SET #status = :status, updated_at = :updated_at',
+			ExpressionAttributeNames: {
+				'#status': 'status',
+			},
+			ExpressionAttributeValues: {
+				':status': 'resolved',
+				':updated_at': getCurrentEpochString(),
+			},
+		}));
+		return true;
+	} catch (error) {
+		console.error('Failed to resolve emergency:', error);
+		return false;
+	}
+}
+
+export async function getAllActiveEmergencies() {
+	try {
+		const result = await ddb.send(new ScanCommand({
+			TableName: 'emergency',
+			FilterExpression: '#status = :status',
+			ExpressionAttributeNames: {
+				'#status': 'status',
+			},
+			ExpressionAttributeValues: {
+				':status': 'active',
+			},
+		}));
+		return result.Items || [];
+	} catch (error) {
+		console.error('Failed to fetch emergencies:', error);
+		return [];
+	}
+}
+
+export async function getEmergencyByDeviceId(deviceId: string) {
+	try {
+		const result = await ddb.send(new GetCommand({
+			TableName: 'emergency',
+			Key: { id: deviceId },
+		}));
+		return result.Item;
+	} catch (error) {
+		console.error('Failed to fetch emergency record:', error);
+		return null;
 	}
 }

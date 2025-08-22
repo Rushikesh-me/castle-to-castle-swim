@@ -71,42 +71,61 @@ export const SwimmerProvider = ({ children }: { children: React.ReactNode }) => 
 
 	// Enhance swimmers with locations and donations
 	const enhanceSwimmersData = useCallback(async () => {
-		if (enhancedDataLoaded || swimmers.length === 0) return;
-		
-
-		setIsLoadingEnhanced(true);
-		try {
-			const usernames = swimmers.map(s => s.username);
-			const idonateUrls = swimmers.map(s => s.idonate_url).filter(Boolean);
+		// Use functional state update to get current swimmers without dependency
+		setSwimmers(currentSwimmers => {
+			if (enhancedDataLoaded || currentSwimmers.length === 0) return currentSwimmers;
 			
-			const response = await fetch("/api/swimmers/enhance", {
+			// Additional safety check: ensure we're enhancing data for the current category
+			if (currentSwimmers.length > 0 && currentSwimmers[0]?.swim_type !== selectedCategory) {
+				return currentSwimmers; // Don't enhance if category doesn't match
+			}
+			
+			setIsLoadingEnhanced(true);
+			
+			// Extract data from current swimmers
+			const usernames = currentSwimmers.map(s => s.username);
+			const idonateUrls = currentSwimmers.map(s => s.idonate_url).filter(Boolean);
+			
+			fetch("/api/swimmers/enhance", {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify({ usernames, idonateUrls, locationLimit: 20 })
+			})
+			.then(response => {
+				if (!response.ok) throw new Error(`Failed to enhance data: ${response.status}`);
+				return response.json();
+			})
+			.then(enhancedData => {
+				// Double-check category still matches before updating
+				setSwimmers(latestSwimmers => {
+					if (latestSwimmers.length > 0 && latestSwimmers[0]?.swim_type !== selectedCategory) {
+						return latestSwimmers; // Don't update if category changed
+					}
+					
+					// Update swimmers with enhanced data
+					const enhancedSwimmers = currentSwimmers.map(swimmer => ({
+						...swimmer,
+						locations: enhancedData.locations[swimmer.username] || [],
+						donations_total: swimmer.idonate_url ? (enhancedData.donations[swimmer.idonate_url] || null) : null,
+					}));
+					
+					const extractedTracks = extractTracks(enhancedSwimmers);
+					setTracks(extractedTracks);
+					setEnhancedDataLoaded(true);
+					
+					return enhancedSwimmers;
+				});
+			})
+			.catch(err => {
+				// Don't fail completely, just log the warning
+			})
+			.finally(() => {
+				setIsLoadingEnhanced(false);
 			});
 			
-			if (!response.ok) throw new Error(`Failed to enhance data: ${response.status}`);
-			const enhancedData = await response.json();
-			
-			// Update swimmers with enhanced data
-			const enhancedSwimmers = swimmers.map(swimmer => ({
-				...swimmer,
-				locations: enhancedData.locations[swimmer.username] || [],
-				donations_total: swimmer.idonate_url ? (enhancedData.donations[swimmer.idonate_url] || null) : null,
-			}));
-			
-			setSwimmers(enhancedSwimmers);
-			const extractedTracks = extractTracks(enhancedSwimmers);
-			setTracks(extractedTracks);
-			setEnhancedDataLoaded(true);
-	
-		} catch (err) {
-	
-			// Don't fail completely, just log the warning
-		} finally {
-			setIsLoadingEnhanced(false);
-		}
-	}, [swimmers, enhancedDataLoaded]);
+			return currentSwimmers; // Return current state unchanged for this update
+		});
+	}, [enhancedDataLoaded, selectedCategory]);
 
 	// Full fetch swimmers (legacy, kept for compatibility)
 	const fetchSwimmers = useCallback(async (category: SwimCategory = selectedCategory) => {
@@ -136,12 +155,25 @@ export const SwimmerProvider = ({ children }: { children: React.ReactNode }) => 
 
 	// Enhanced category switching with progressive loading
 	const setSelectedCategory = useCallback(async (category: SwimCategory) => {
+		// Clear any existing data first
+		setSwimmers([]);
+		setTracks([]);
+		setEnhancedDataLoaded(false);
+		
+		// Update the category state
 		setSelectedCategoryState(category);
-		// Fast fetch first, then enhance
+		
+		// Fast fetch for the new category
 		await fetchSwimmersFast(category);
-		// Enhance data in background
-		setTimeout(() => enhanceSwimmersData(), 100);
-	}, [fetchSwimmersFast, enhanceSwimmersData]);
+		
+		// Enhance data in background after a delay
+		setTimeout(() => {
+			// Only enhance if we're still on the same category
+			if (category === selectedCategory) {
+				enhanceSwimmersData();
+			}
+		}, 100);
+	}, [fetchSwimmersFast, enhanceSwimmersData, selectedCategory]);
 
 	// Fetch swimmer's full history
 	const fetchSwimmerHistory = useCallback(async (username: string): Promise<LocationPoint[]> => {
@@ -160,19 +192,33 @@ export const SwimmerProvider = ({ children }: { children: React.ReactNode }) => 
 		}
 	}, []);
 
-	// Refetch swimmers when category or page changes
+	// Initial fetch on mount
 	useEffect(() => {
 		fetchSwimmersFast(selectedCategory);
+	}, []); // Empty dependency array - only run on mount
+
+	// Only refetch when page changes, not when category changes
+	useEffect(() => {
+		if (page > 1) {
+			fetchSwimmersFast(selectedCategory);
+		}
 	}, [page, fetchSwimmersFast, selectedCategory]);
 
-	// Auto-enhance data after fast fetch
+	// Auto-enhance data after fast fetch (only when not already enhanced and category matches)
 	useEffect(() => {
 		if (swimmers.length > 0 && !enhancedDataLoaded && !isLoading) {
 			// Delay enhancement to allow UI to render first
-			const timer = setTimeout(() => enhanceSwimmersData(), 500);
+			const timer = setTimeout(() => {
+				// Only enhance if we're still on the same category
+				if (swimmers.length > 0 && swimmers[0]?.swim_type === selectedCategory) {
+					enhanceSwimmersData();
+				}
+			}, 500);
 			return () => clearTimeout(timer);
 		}
-	}, [swimmers, enhancedDataLoaded, isLoading, enhanceSwimmersData]);
+	}, [swimmers.length, enhancedDataLoaded, isLoading, selectedCategory]);
+
+
 
 	const value: SwimmerContextType = {
 		swimmers,

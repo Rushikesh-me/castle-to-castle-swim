@@ -9,6 +9,7 @@ interface MarkerClustererProps {
   onMarkerClick: (track: DrawTrack) => void;
   selectedSwimmer: DrawTrack | null;
   swimmers: SwimmerTrack[];
+  selectedCategory: "solo" | "relay";
 }
 
 interface Cluster {
@@ -33,7 +34,7 @@ function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: numbe
   return R * c;
 }
 
-export function MarkerClusterer({ tracks, onMarkerClick, selectedSwimmer, swimmers }: MarkerClustererProps) {
+export function MarkerClusterer({ tracks, onMarkerClick, selectedSwimmer, swimmers, selectedCategory }: MarkerClustererProps) {
   const [clusters, setClusters] = useState<Cluster[]>([]);
   const map = useMap();
 
@@ -67,7 +68,7 @@ export function MarkerClusterer({ tracks, onMarkerClick, selectedSwimmer, swimme
     
 
     const clusters: Cluster[] = [];
-    const clusterRadius = Math.max(50, 1000 / Math.pow(2, zoom)); // Adjust radius based on zoom
+    const clusterRadius = Math.max(10, 1000 / Math.pow(2, zoom)); // Adjust radius based on zoom
 
     validTracks.forEach(track => {
       let addedToCluster = false;
@@ -172,7 +173,7 @@ export function MarkerClusterer({ tracks, onMarkerClick, selectedSwimmer, swimme
                     <img 
                       src={swimmerData.avatar} 
                       alt={track.label}
-                      className={`w-10 h-10 rounded-full border-3 shadow-lg ${
+                      className={`w-10 h-10 rounded-full border-3 shadow-lg object-cover ${
                         isSelected ? "border-orange-300 scale-110" : "border-blue-300"
                       }`}
                     />
@@ -240,8 +241,12 @@ export function MarkerClusterer({ tracks, onMarkerClick, selectedSwimmer, swimme
                 {/* Enhanced tooltip showing click functionality */}
                 <div className="absolute -bottom-8 left-1/2 transform -translate-x-1/2 bg-white/90 backdrop-blur px-2 py-1 rounded text-xs font-semibold text-gray-800 whitespace-nowrap shadow-sm">
                   <div className="text-center">
-                    <div className="font-bold">{cluster.tracks.length} swimmers</div>
-                    <div className="text-xs text-gray-600">Click to see first swimmer</div>
+                    <div className="font-bold">
+                      {cluster.tracks.length} {selectedCategory === "solo" ? "swimmers" : "teams"}
+                    </div>
+                    <div className="text-xs text-gray-600">
+                      Click to see first {selectedCategory === "solo" ? "swimmer" : "team"}
+                    </div>
                   </div>
                 </div>
               </div>
