@@ -37,7 +37,7 @@ interface SwimmerStats {
 
 export default function EnhancedSwimTracker() {
 	const searchParams = useSearchParams();
-	const { swimmers, tracks, isLoading, isLoadingEnhanced, error, selectedCategory, setSelectedCategory, fetchSwimmers, swimmerHistory, fetchSwimmerHistory, loadingHistory, page, setPage, hasMore, selectedSwimmerFromUrl, setSelectedSwimmerFromUrl } = useSwimmers();
+	const { swimmers, tracks, isLoading, isLoadingEnhanced, enhancedDataLoaded, error, selectedCategory, setSelectedCategory, fetchSwimmers, swimmerHistory, fetchSwimmerHistory, loadingHistory, page, setPage, hasMore, selectedSwimmerFromUrl, setSelectedSwimmerFromUrl } = useSwimmers();
 	const [selectedSwimmer, setSelectedSwimmer] = useState<DrawTrack | null>(null);
 	const [showBottomSheet, setShowBottomSheet] = useState(false);
 	const [currentSwimmerIndex, setCurrentSwimmerIndex] = useState(0);
@@ -103,9 +103,24 @@ export default function EnhancedSwimTracker() {
 			(locations[locations.length - 1].tst - locations[0].tst) / 60 : 0; // in minutes
 		const averagePace = duration > 0 ? totalDistance / duration : 0; // meters per minute
 
-		// Get current swimmer data for race progress
+		// Get current swimmer data for race progress - use enhanced data from tracks
 		const currentSwimmerData = swimmers.find(s => s.username === track.id);
-		const raceProgress = currentSwimmerData ? calculateRaceProgress(currentSwimmerData) : 0;
+		// Create a swimmer object with current location from track for accurate progress calculation
+		const swimmerWithCurrentLocation = currentSwimmerData ? {
+			...currentSwimmerData,
+			locations: track.current ? [{
+				lat: track.current.lat,
+				lon: track.current.lon,
+				tst: Date.now() / 1000,
+				acc: 0,
+				conn: "unknown",
+				alt: null,
+				batt: 100,
+				pk: track.id,
+				tid: "current"
+			}] : []
+		} : null;
+		const raceProgress = swimmerWithCurrentLocation ? calculateRaceProgress(swimmerWithCurrentLocation) : 0;
 
 		// Calculate rankings
 		const donationsRanking = swimmers
@@ -114,10 +129,39 @@ export default function EnhancedSwimTracker() {
 			.findIndex(s => s.username === track.id) + 1;
 
 		const swimPositionRanking = swimmers
-			.filter(s => s.start_time && hasRaceStartedUtil(s.start_time) && s.locations.length > 0)
+			.filter(s => s.start_time && hasRaceStartedUtil(s.start_time))
 			.sort((a, b) => {
-				const aProgress = calculateRaceProgress(a);
-				const bProgress = calculateRaceProgress(b);
+				// Create swimmer objects with current locations from tracks for accurate ranking
+				const trackA = tracks.find(t => t.id === a.username);
+				const trackB = tracks.find(t => t.id === b.username);
+				
+				if (!trackA?.current || !trackB?.current) return 0;
+				
+				const aWithLocation = { ...a, locations: [{
+					lat: trackA.current.lat,
+					lon: trackA.current.lon,
+					tst: Date.now() / 1000,
+					acc: 0,
+					conn: "unknown",
+					alt: null,
+					batt: 100,
+					pk: a.username,
+					tid: "current"
+				}]};
+				const bWithLocation = { ...b, locations: [{
+					lat: trackB.current.lat,
+					lon: trackB.current.lon,
+					tst: Date.now() / 1000,
+					acc: 0,
+					conn: "unknown",
+					alt: null,
+					batt: 100,
+					pk: b.username,
+					tid: "current"
+				}]};
+				
+				const aProgress = calculateRaceProgress(aWithLocation);
+				const bProgress = calculateRaceProgress(bWithLocation);
 				return bProgress - aProgress;
 			})
 			.findIndex(s => s.username === track.id) + 1;
@@ -304,16 +348,44 @@ export default function EnhancedSwimTracker() {
 				</div>
 			</div>
 
-			{/* OPTIMIZED: Loading indicator - only show when actually loading */}
-			{isLoading && (
-				<div className="absolute top-20 left-1/2 transform -translate-x-1/2 z-10">
-					<div className="bg-white/90 backdrop-blur-sm rounded-lg shadow-lg border border-gray-200 px-4 py-2">
-						<div className="flex items-center">
-							<Loader2 className="w-4 h-4 mr-2 animate-spin" />
-							<span className="text-sm text-gray-600">
-								Loading {selectedCategory === "solo" ? "swimmers" : "relay teams"}...
-							</span>
+
+			
+			{/* Loading screen overlay - blurs map during initial loading and real-time location fetching */}
+			{(isLoading || (isLoadingEnhanced && !enhancedDataLoaded) || (tracks.length > 0 && !enhancedDataLoaded)) && (
+				<div className="absolute inset-0 bg-white/80 backdrop-blur-md z-20 flex items-center justify-center">
+					<div className="text-center space-y-4">
+						<div className="animate-spin rounded-full h-16 w-16 border-b-4 border-blue-600 mx-auto"></div>
+						<div className="space-y-2">
+							<h3 className="text-xl font-semibold text-gray-900">
+								{isLoading 
+									? `Loading ${selectedCategory === "solo" ? "Swimmers" : "Relay Teams"}`
+									: "Fetching Real-Time Locations"
+								}
+							</h3>
+							<p className="text-gray-600 max-w-md">
+								{isLoading
+									? `Fetching ${selectedCategory === "solo" ? "swimmer" : "team"} data and preparing the map...`
+									: `Getting current positions for all ${selectedCategory === "solo" ? "swimmers" : "relay teams"}...`
+								}
+							</p>
+							<div className="flex items-center justify-center space-x-2 text-sm text-blue-600">
+								<Loader2 className="w-4 h-4 animate-spin" />
+								<span>
+									{isLoading ? "Please wait..." : "This may take a few seconds"}
+								</span>
+							</div>
 						</div>
+					</div>
+				</div>
+			)}
+			
+			{/* Subtle indicator when markers are at start positions but real locations are loading */}
+			{!isLoading && isLoadingEnhanced && enhancedDataLoaded && (
+				<div className="absolute top-32 left-1/2 transform -translate-x-1/2 z-10">
+					<div className="bg-blue-50/90 backdrop-blur-sm rounded-lg shadow-sm border border-blue-200 px-3 py-1">
+						<span className="text-xs text-blue-600">
+							Updating marker positions...
+						</span>
 					</div>
 				</div>
 			)}
@@ -344,7 +416,6 @@ export default function EnhancedSwimTracker() {
 					defaultCenter={fallbackCenter}
 					gestureHandling="greedy"
 					defaultZoom={16}
-					minZoom={14}
 					mapId={process.env.NEXT_PUBLIC_MAP_ID}
 					disableDefaultUI={true}
 					mapTypeControl={false}

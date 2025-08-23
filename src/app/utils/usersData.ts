@@ -37,25 +37,33 @@ function calculateTotalRaceDistance(swimType: string): number {
  * Formula: [(distance of marker from start / (distance of marker from start + distance of marker from end)) * 100]
  */
 export function calculateRaceProgress(swimmer: SwimmerTrack): number {
-	if (!swimmer.start_time || !hasRaceStarted(swimmer.start_time) || swimmer.locations.length === 0) {
+	if (!swimmer.start_time || !hasRaceStarted(swimmer.start_time)) {
+		return 0;
+	}
+	
+	// Get the current marker position (this handles the data structure correctly)
+	const currentPosition = getMarkerPosition(swimmer);
+	
+	// If we're at start position, progress is 0%
+	if (currentPosition.lat === (swimmer.swim_type === "solo" ? SOLO_START_LOCATION.lat : RELAY_START_LOCATION.lat) &&
+		currentPosition.lng === (swimmer.swim_type === "solo" ? SOLO_START_LOCATION.lng : RELAY_START_LOCATION.lng)) {
 		return 0;
 	}
 	
 	const startLocation = swimmer.swim_type === "solo" ? SOLO_START_LOCATION : RELAY_START_LOCATION;
-	const lastLocation = swimmer.locations[swimmer.locations.length - 1];
 	
 	// Calculate distance from start to current marker position
 	const distanceFromStart = calculateDistance(
 		startLocation.lat,
 		startLocation.lng,
-		lastLocation.lat,
-		lastLocation.lon
+		currentPosition.lat,
+		currentPosition.lng
 	);
 	
 	// Calculate distance from current marker position to end
 	const distanceToEnd = calculateDistance(
-		lastLocation.lat,
-		lastLocation.lon,
+		currentPosition.lat,
+		currentPosition.lng,
 		END_LOCATION.lat,
 		END_LOCATION.lng
 	);
@@ -65,7 +73,7 @@ export function calculateRaceProgress(swimmer: SwimmerTrack): number {
 	
 	if (totalDistanceCovered === 0) return 0;
 	
-	// Return progress as percentage: (distance from start
+	// Return progress as percentage: (distance from start / total distance) * 100
 	return Math.min((distanceFromStart / totalDistanceCovered) * 100, 100);
 }
 

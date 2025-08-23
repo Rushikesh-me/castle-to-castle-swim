@@ -16,6 +16,7 @@ type RankingType = "donations" | "swim_position";
 function LeaderboardsContent() {
   const {
     swimmers,
+    tracks,
     isLoading,
     isLoadingEnhanced,
     error,
@@ -29,7 +30,7 @@ function LeaderboardsContent() {
 
   const [rankingType, setRankingType] = useState<RankingType>("donations");
 
-  // Calculate swim position ranking
+  // Calculate swim position ranking using tracks data for accurate positioning
   const calculateSwimPositionRanking = (swimmers: SwimmerTrack[]): SwimmerTrack[] => {
     const currentTime = Math.floor(Date.now() / 1000);
     
@@ -43,25 +44,31 @@ function LeaderboardsContent() {
         const startTime = parseInt(swimmer.start_time!);
         const timeElapsed = currentTime - startTime;
         
-        // Calculate progress based on correct formula: [(distance from start / (distance from start + distance to end)) * 100]
+        // Find the corresponding track for this swimmer
+        const track = tracks.find(t => t.id === swimmer.username);
         let progress = 0;
-        if (swimmer.locations.length > 0) {
+        
+        if (track?.current) {
           const startLocation = swimmer.swim_type === "solo" ? 
             { lat: 53.541085, lng: -8.005591 } : 
             { lat: 53.540183, lng: -7.989841 };
           const endLocation = { lat: 53.423516, lng: -7.941642 };
           
-          const lastLocation = swimmer.locations[swimmer.locations.length - 1];
+          // Debug: Log the coordinates being used
+          console.log(`Calculating for ${swimmer.username}: start=${JSON.stringify(startLocation)}, current=${JSON.stringify(track.current)}, end=${JSON.stringify(endLocation)}`);
+          
+          // Use current marker position from track
+          const currentLocation = track.current;
           
           // Calculate distance from start to current marker position
           const distanceFromStart = calculateDistance(
             startLocation.lat, startLocation.lng,
-            lastLocation.lat, lastLocation.lon
+            currentLocation.lat, currentLocation.lon
           );
           
           // Calculate distance from current marker position to end
           const distanceToEnd = calculateDistance(
-            lastLocation.lat, lastLocation.lon,
+            currentLocation.lat, currentLocation.lon,
             endLocation.lat, endLocation.lng
           );
           
@@ -76,12 +83,33 @@ function LeaderboardsContent() {
         // Calculate ranking score: progress per unit time
         const rankingScore = timeElapsed > 0 ? progress / timeElapsed : 0;
         
+        // Debug logging
+        console.log(`Swimmer ${swimmer.username}: progress=${progress.toFixed(2)}%, timeElapsed=${timeElapsed}s, rankingScore=${rankingScore.toFixed(6)}`);
+        
         return {
           ...swimmer,
           rankingScore
         };
       })
       .sort((a, b) => b.rankingScore - a.rankingScore);
+      
+    // Debug: Log the final sorted results
+    const sortedResults = swimmers
+      .filter(swimmer => {
+        if (!swimmer.start_time || !hasRaceStarted(swimmer.start_time)) return false;
+        return true;
+      })
+      .map(swimmer => {
+        const track = tracks.find(t => t.id === swimmer.username);
+        return {
+          username: swimmer.username,
+          hasTrack: !!track,
+          hasCurrent: !!track?.current,
+          currentLat: track?.current?.lat,
+          currentLon: track?.current?.lon
+        };
+      });
+    console.log('Swim position sorting debug:', sortedResults);
   };
 
   // Haversine distance calculation
@@ -110,10 +138,14 @@ function LeaderboardsContent() {
         return bDonations - aDonations;
       });
     } else {
-      // Sort by swim position (requires locations, may be loading)
+      // Sort by swim position (requires tracks data)
+      if (tracks.length === 0) {
+        // If tracks aren't ready yet, return original order
+        return swimmers;
+      }
       return calculateSwimPositionRanking(swimmers);
     }
-  }, [swimmers, rankingType]);
+  }, [swimmers, tracks, rankingType]);
 
   // Handle category change with progressive loading
   const handleCategoryChange = async (category: SwimCategory) => {
@@ -198,6 +230,14 @@ function LeaderboardsContent() {
             <div className="flex items-center text-sm text-blue-600">
               <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
               Loading enhanced data...
+            </div>
+          )}
+          
+          {/* Swim Position Sorting Status */}
+          {rankingType === "swim_position" && tracks.length === 0 && (
+            <div className="flex items-center text-sm text-orange-600">
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-orange-600 mr-2"></div>
+              Preparing swim position data...
             </div>
           )}
         </div>

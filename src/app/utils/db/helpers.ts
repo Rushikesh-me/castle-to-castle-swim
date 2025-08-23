@@ -10,9 +10,18 @@ import { getCurrentEpochString } from "../timeUtils";
 const donationsCache = new Map<string, { amount: number | null; timestamp: number }>();
 const DONATIONS_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
-// Cache for swimmer data
+// Cache for basic swimmer data (without locations) - only cache the static user info
 const swimmersCache = new Map<string, { data: SwimmerUser[]; timestamp: number }>();
 const SWIMMERS_CACHE_TTL = 30 * 1000; // 30 seconds - more aggressive caching for faster switching
+
+// Cache for real-time locations - shorter TTL to ensure freshness
+const locationsCache = new Map<string, { data: SwimmerTrack[]; timestamp: number }>();
+const LOCATIONS_CACHE_TTL = 10 * 1000; // 10 seconds - very short TTL for real-time data
+
+// Function to clear locations cache (useful when switching categories)
+export function clearLocationsCache(): void {
+	locationsCache.clear();
+}
 
 async function fetchIdonateTotal(idonateUrl?: string): Promise<number | null> {
 	try {
@@ -89,17 +98,39 @@ export async function batchFetchIdonateTotals(idonateUrls: string[]): Promise<Ma
 	return results;
 }
 
-// Batch fetch locations for multiple swimmers
+// Batch fetch locations for multiple swimmers with caching
 export async function batchFetchLocations(usernames: string[], locationLimit: number = 20): Promise<Map<string, SwimmerTrack[]>> {
 	const results = new Map<string, SwimmerTrack[]>();
 	
 	if (usernames.length === 0) return results;
 	
-	// Process in parallel with concurrency limit
-	const concurrencyLimit = 10;
+		// Check cache first for each username
+	const uncachedUsernames: string[] = [];
+	const cachedResults = new Map<string, SwimmerTrack[]>();
+	
+	for (const username of usernames) {
+		const cacheKey = `locations_${username}_${locationLimit}`;
+		const cached = locationsCache.get(cacheKey);
+		
+		if (cached && Date.now() - cached.timestamp < LOCATIONS_CACHE_TTL) {
+			// Use cached data
+			cachedResults.set(username, cached.data);
+		} else {
+			// Need to fetch fresh data
+			uncachedUsernames.push(username);
+		}
+	}
+	
+	// Return cached results immediately if all data is cached
+	if (uncachedUsernames.length === 0) {
+		return cachedResults;
+	}
+	
+	// Fetch uncached data in parallel
+	const concurrencyLimit = 25; // Increased from 10 for faster processing
 	const chunks = [];
-	for (let i = 0; i < usernames.length; i += concurrencyLimit) {
-		chunks.push(usernames.slice(i, i + concurrencyLimit));
+	for (let i = 0; i < uncachedUsernames.length; i += concurrencyLimit) {
+		chunks.push(uncachedUsernames.slice(i, i + concurrencyLimit));
 	}
 	
 	for (const chunk of chunks) {
@@ -127,7 +158,6 @@ export async function batchFetchLocations(usernames: string[], locationLimit: nu
 				
 				return { username, locations };
 			} catch (error) {
-		
 				return { username, locations: [] };
 			}
 		});
@@ -142,11 +172,21 @@ export async function batchFetchLocations(usernames: string[], locationLimit: nu
 					swim_type: "solo", // Default swim type, could be enhanced later
 					locations: [location] // Wrap single location in array
 				}));
+				
+				// Cache the result
+				const cacheKey = `locations_${result.value.username}_${locationLimit}`;
+				locationsCache.set(cacheKey, { 
+					data: swimmerTracks, 
+					timestamp: Date.now() 
+				});
+				
 				results.set(result.value.username, swimmerTracks);
 			}
 		});
 	}
-	return results;
+	
+	// Combine cached and fresh results
+	return new Map([...cachedResults, ...results]);
 }
 
 // Fast fetch swimmers without locations (for initial display)
