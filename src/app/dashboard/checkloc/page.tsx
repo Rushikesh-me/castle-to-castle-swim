@@ -1,8 +1,8 @@
 "use client";
 
 import { useSession } from "next-auth/react";
-import { useState, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/app/components/ui/card";
+import { useState, useEffect, useCallback } from "react";
+import { Card, CardContent } from "@/app/components/ui/card";
 import { Button } from "@/app/components/ui/button";
 import { ArrowLeft, MapPin, Clock, User, Users, RefreshCw, AlertTriangle } from "lucide-react";
 import Link from "next/link";
@@ -24,7 +24,8 @@ export default function LocationCheckPage() {
 	const [isLoading, setIsLoading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 
-	const fetchLocationChecks = async () => {
+	// Define fetchLocationChecks function
+	const fetchLocationChecks = useCallback(async () => {
 		setIsLoading(true);
 		setError(null);
 		try {
@@ -39,11 +40,14 @@ export default function LocationCheckPage() {
 		} finally {
 			setIsLoading(false);
 		}
-	};
-
-	useEffect(() => {
-		fetchLocationChecks();
 	}, []);
+
+	// Call useEffect at the top level (before any early returns)
+	useEffect(() => {
+		if (session?.user?.is_admin) {
+			fetchLocationChecks();
+		}
+	}, [session?.user?.is_admin, fetchLocationChecks]);
 
 	// Redirect non-admin users
 	if (status === "loading") {

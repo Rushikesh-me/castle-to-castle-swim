@@ -64,7 +64,7 @@ export const SwimmerProvider = ({ children }: { children: React.ReactNode }) => 
 	setEnhancedDataLoaded(false); // Reset enhanced data flag
 	
 	// Immediately enhance data to get real locations
-	enhanceSwimmersData();
+	// enhanceSwimmersData();
 		} catch (err) {
 			setError(err instanceof Error ? err.message : "Failed to fetch swimmers");
 			setSwimmers([]);
@@ -207,6 +207,14 @@ export const SwimmerProvider = ({ children }: { children: React.ReactNode }) => 
 	}, [page, fetchSwimmersFast, selectedCategory]);
 
 
+  useEffect(() => {
+		if (swimmers.length > 0 && !enhancedDataLoaded && !isLoading) {
+			// Only enhance if we're still on the same category
+			if (swimmers.length > 0 && swimmers[0]?.swim_type === selectedCategory) {
+				enhanceSwimmersData();
+			}
+		}
+	}, [swimmers.length, enhancedDataLoaded, isLoading, selectedCategory, enhanceSwimmersData]);
 
 
 	// Immediate loading stop when tracks are ready
