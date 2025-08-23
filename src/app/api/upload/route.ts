@@ -21,14 +21,7 @@ export async function POST(request: NextRequest) {
 		const file = formData.get('image') as File;
 		const bio = formData.get('bio') as string;
 
-		// Debug logging
-		console.log("FormData received:", {
-			hasFile: !!file,
-			fileName: file?.name,
-			fileSize: file?.size,
-			fileType: file?.type,
-			bio: bio
-		});
+
 
 		if (!file) {
 			return NextResponse.json({ 

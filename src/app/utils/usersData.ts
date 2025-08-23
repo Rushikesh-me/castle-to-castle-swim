@@ -65,7 +65,7 @@ export function calculateRaceProgress(swimmer: SwimmerTrack): number {
 	
 	if (totalDistanceCovered === 0) return 0;
 	
-	// Return progress as percentage: (distance from start / total distance covered) * 100
+	// Return progress as percentage: (distance from start
 	return Math.min((distanceFromStart / totalDistanceCovered) * 100, 100);
 }
 
@@ -73,8 +73,6 @@ export function calculateRaceProgress(swimmer: SwimmerTrack): number {
  * Get marker position based on swimmer status
  */
 export function getMarkerPosition(swimmer: SwimmerTrack): { lat: number; lng: number } {
-	const currentTime = Math.floor(Date.now() / 1000); // Current time in seconds
-	
 	// Helper function to validate coordinates
 	const isValidCoordinate = (lat: number, lng: number): boolean => {
 		return typeof lat === 'number' && 
@@ -85,44 +83,51 @@ export function getMarkerPosition(swimmer: SwimmerTrack): { lat: number; lng: nu
 			   lng >= -180 && lng <= 180;
 	};
 	
-	// If swimmer is disqualified, show at last known location
-	if (swimmer.is_disqualified && swimmer.locations.length > 0) {
+	// Check if race has started
+	const raceHasStarted = swimmer.start_time ? hasRaceStarted(swimmer.start_time) : false;
+	
+	// If race hasn't started, always show at start position
+	if (!raceHasStarted) {
+		const startPos = swimmer.swim_type === "solo" ? SOLO_START_LOCATION : RELAY_START_LOCATION;
+		return startPos;
+	}
+	
+	// If race has started, prioritize real-time location
+	if (swimmer.locations && swimmer.locations.length > 0) {
+		// Check if the first item has nested locations (data structure issue)
+		const firstItem = swimmer.locations[0] as unknown as { locations: LocationPoint[] };
+		if (firstItem && firstItem.locations && Array.isArray(firstItem.locations) && firstItem.locations.length > 0) {
+			// Data structure issue: locations array contains swimmer objects with nested locations
+			const actualLastLocation = firstItem.locations[firstItem.locations.length - 1];
+			
+			if (isValidCoordinate(actualLastLocation.lat, actualLastLocation.lon)) {
+				return { lat: actualLastLocation.lat, lng: actualLastLocation.lon };
+			}
+		}
+		
+		// Try normal location access
 		const lastLocation = swimmer.locations[swimmer.locations.length - 1];
+		
 		if (isValidCoordinate(lastLocation.lat, lastLocation.lon)) {
 			return { lat: lastLocation.lat, lng: lastLocation.lon };
 		}
 	}
 	
-	// If no start time or race hasn't started, show at start location
-	if (!swimmer.start_time || !hasRaceStarted(swimmer.start_time)) {
-		return swimmer.swim_type === "solo" ? SOLO_START_LOCATION : RELAY_START_LOCATION;
-	}
-	
-	// If race has started and has location history, show at current location
-	if (swimmer.locations.length > 0) {
-		const lastLocation = swimmer.locations[swimmer.locations.length - 1];
-		if (isValidCoordinate(lastLocation.lat, lastLocation.lon)) {
-			return { lat: lastLocation.lat, lng: lastLocation.lon };
-		}
-	}
-	
-	// Fallback to start location
-	return swimmer.swim_type === "solo" ? SOLO_START_LOCATION : RELAY_START_LOCATION;
+	// If race has started but no valid location data, show at start position
+	// This is a fallback for when location data is corrupted or invalid
+	const startPos = swimmer.swim_type === "solo" ? SOLO_START_LOCATION : RELAY_START_LOCATION;
+	return startPos;
 }
 
 /**
  * Enhanced function to extract and validate swim tracks from raw swimmer data
  */
 export function extractTracks(swimmers: SwimmerTrack[]): DrawTrack[] {
-
-
 	if (!Array.isArray(swimmers)) {
-
 		return [];
 	}
 
 	if (swimmers.length === 0) {
-
 		return [];
 	}
 
@@ -130,7 +135,6 @@ export function extractTracks(swimmers: SwimmerTrack[]): DrawTrack[] {
 		.filter((swimmer) => {
 			// Validate swimmer object structure
 			if (!swimmer.username) {
-		
 				return false;
 			}
 
@@ -140,18 +144,6 @@ export function extractTracks(swimmers: SwimmerTrack[]): DrawTrack[] {
 		.map((swimmer): DrawTrack | null => {
 			// Get marker position based on swimmer status
 			const markerPosition = getMarkerPosition(swimmer);
-			
-			// Validate marker position coordinates
-			if (!markerPosition || 
-				typeof markerPosition.lat !== 'number' || 
-				typeof markerPosition.lng !== 'number' ||
-				isNaN(markerPosition.lat) || 
-				isNaN(markerPosition.lng) ||
-				!isFinite(markerPosition.lat) || 
-				!isFinite(markerPosition.lng)) {
-		
-				return null;
-			}
 			
 			// Create a synthetic current location for the marker
 			// Note: LocationPoint uses 'lon', but we need to convert to 'lng' for Google Maps
@@ -169,20 +161,10 @@ export function extractTracks(swimmers: SwimmerTrack[]): DrawTrack[] {
 
 			// Convert locations to Google Maps LatLngLiteral format
 			// LocationPoint uses 'lon', Google Maps uses 'lng'
-			const pathPoints = (swimmer.locations || [])
-				.filter((location) => 
-					location && 
-					typeof location.lat === 'number' && 
-					typeof location.lon === 'number' &&
-					isFinite(location.lat) && 
-					isFinite(location.lon) &&
-					location.lat >= -90 && location.lat <= 90 &&
-					location.lon >= -180 && location.lon <= 180
-				)
-				.map((location) => ({
-					lat: location.lat,
-					lng: location.lon, // Convert lon to lng for Google Maps
-				}));
+			const pathPoints = (swimmer.locations || []).map((location) => ({
+				lat: location.lat,
+				lng: location.lon, // Convert lon to lng for Google Maps
+			}));
 
 			// Always create a track, even if no locations
 			const track: DrawTrack = {
@@ -310,33 +292,28 @@ export function calculateSwimPositionRanking(swimmers: SwimmerTrack[]): SwimmerT
 			const startTime = parseInt(swimmer.start_time!);
 			const timeElapsed = currentTime - startTime;
 			
-			// Calculate progress based on correct formula: [(distance from start / (distance from start + distance to end)) * 100]
+			// Calculate progress based on distance from start
 			let progress = 0;
 			if (swimmer.locations.length > 0) {
 				const startLocation = swimmer.swim_type === "solo" ? SOLO_START_LOCATION : RELAY_START_LOCATION;
-				const lastLocation = swimmer.locations[swimmer.locations.length - 1];
 				
-				// Calculate distance from start to current marker position
-				const distanceFromStart = calculateDistance(
+				// Calculate total race distance
+				const totalRaceDistance = calculateDistance(
 					startLocation.lat, 
-					startLocation.lng,
-					lastLocation.lat, 
-					lastLocation.lon
-				);
-				
-				// Calculate distance from current marker position to end
-				const distanceToEnd = calculateDistance(
-					lastLocation.lat,
-					lastLocation.lon,
+					startLocation.lng, 
 					END_LOCATION.lat, 
 					END_LOCATION.lng
 				);
 				
-				// Calculate total distance covered (start to current + current to end)
-				const totalDistanceCovered = distanceFromStart + distanceToEnd;
-				
-				if (totalDistanceCovered > 0) {
-					progress = Math.min((distanceFromStart / totalDistanceCovered) * 100, 100);
+				if (totalRaceDistance > 0) {
+					const lastLocation = swimmer.locations[swimmer.locations.length - 1];
+					const distanceFromStart = calculateDistance(
+						startLocation.lat, 
+						startLocation.lng,
+						lastLocation.lat, 
+						lastLocation.lon
+					);
+					progress = Math.min((distanceFromStart / totalRaceDistance) * 100, 100);
 				}
 			}
 			

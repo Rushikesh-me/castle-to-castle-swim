@@ -1,7 +1,8 @@
 "use client";
 import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from "react";
 import { SwimmerTrack, DrawTrack, LocationPoint } from "@/app/types";
-import { extractTracks } from "@/app/utils/usersData";
+import { extractTracks, SOLO_START_LOCATION, RELAY_START_LOCATION } from "@/app/utils/usersData";
+import { hasRaceStarted } from "@/app/utils/timeUtils";
 
 type SwimCategory = "solo" | "relay";
 
@@ -53,18 +54,22 @@ export const SwimmerProvider = ({ children }: { children: React.ReactNode }) => 
 			if (!response.ok) throw new Error(`Failed to fetch swimmers: ${response.status}`);
 			const data = await response.json();
 	
-			
 			setSwimmers(data);
-			const extractedTracks = extractTracks(data);
-			setTracks(extractedTracks);
-			setHasMore(Array.isArray(data) && data.length === 20);
-			setEnhancedDataLoaded(false); // Reset enhanced data flag
+			
+				// Create tracks with proper positioning logic
+	const extractedTracks = extractTracks(data);
+	setTracks(extractedTracks);
+	
+	setHasMore(Array.isArray(data) && data.length === 20);
+	setEnhancedDataLoaded(false); // Reset enhanced data flag
+	
+	// Immediately enhance data to get real locations
+	enhanceSwimmersData();
 		} catch (err) {
 			setError(err instanceof Error ? err.message : "Failed to fetch swimmers");
 			setSwimmers([]);
 			setTracks([]);
 			setHasMore(false);
-		} finally {
 			setIsLoading(false);
 		}
 	}, [selectedCategory]);
@@ -109,6 +114,7 @@ export const SwimmerProvider = ({ children }: { children: React.ReactNode }) => 
 						donations_total: swimmer.idonate_url ? (enhancedData.donations[swimmer.idonate_url] || null) : null,
 					}));
 					
+					// OPTIMIZED: Update tracks with real locations immediately
 					const extractedTracks = extractTracks(enhancedSwimmers);
 					setTracks(extractedTracks);
 					setEnhancedDataLoaded(true);
@@ -153,8 +159,12 @@ export const SwimmerProvider = ({ children }: { children: React.ReactNode }) => 
 		}
 	}, [selectedCategory, page]);
 
-	// Enhanced category switching with progressive loading
+	// OPTIMIZED: Enhanced category switching with immediate data loading
 	const setSelectedCategory = useCallback(async (category: SwimCategory) => {
+		// Set loading state immediately when switching categories
+		setIsLoading(true);
+		setError(null);
+		
 		// Clear any existing data first
 		setSwimmers([]);
 		setTracks([]);
@@ -163,17 +173,9 @@ export const SwimmerProvider = ({ children }: { children: React.ReactNode }) => 
 		// Update the category state
 		setSelectedCategoryState(category);
 		
-		// Fast fetch for the new category
-		await fetchSwimmersFast(category);
-		
-		// Enhance data in background after a delay
-		setTimeout(() => {
-			// Only enhance if we're still on the same category
-			if (category === selectedCategory) {
-				enhanceSwimmersData();
-			}
-		}, 100);
-	}, [fetchSwimmersFast, enhanceSwimmersData, selectedCategory]);
+			// Fast fetch for the new category - await to ensure data loads immediately
+	await fetchSwimmersFast(category);
+	}, [fetchSwimmersFast, enhanceSwimmersData]);
 
 	// Fetch swimmer's full history
 	const fetchSwimmerHistory = useCallback(async (username: string): Promise<LocationPoint[]> => {
@@ -204,19 +206,16 @@ export const SwimmerProvider = ({ children }: { children: React.ReactNode }) => 
 		}
 	}, [page, fetchSwimmersFast, selectedCategory]);
 
-	// Auto-enhance data after fast fetch (only when not already enhanced and category matches)
+
+
+
+	// Immediate loading stop when tracks are ready
 	useEffect(() => {
-		if (swimmers.length > 0 && !enhancedDataLoaded && !isLoading) {
-			// Delay enhancement to allow UI to render first
-			const timer = setTimeout(() => {
-				// Only enhance if we're still on the same category
-				if (swimmers.length > 0 && swimmers[0]?.swim_type === selectedCategory) {
-					enhanceSwimmersData();
-				}
-			}, 500);
-			return () => clearTimeout(timer);
+		if (isLoading && tracks.length > 0) {
+			// Stop loading immediately when tracks are created
+			setIsLoading(false);
 		}
-	}, [swimmers.length, enhancedDataLoaded, isLoading, selectedCategory]);
+	}, [tracks.length, isLoading]);
 
 
 

@@ -115,7 +115,8 @@ export function hasRaceStarted(startTimeEpoch?: string): boolean {
 		return false;
 	}
 	const currentEpoch = Math.floor(Date.now() / 1000);
-	return currentEpoch > parseInt(startTimeEpoch);
+	const startEpoch = parseInt(startTimeEpoch);
+	return currentEpoch > startEpoch;
 }
 
 /**

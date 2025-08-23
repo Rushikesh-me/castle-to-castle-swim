@@ -12,7 +12,7 @@ const DONATIONS_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
 // Cache for swimmer data
 const swimmersCache = new Map<string, { data: SwimmerUser[]; timestamp: number }>();
-const SWIMMERS_CACHE_TTL = 2 * 60 * 1000; // 2 minutes
+const SWIMMERS_CACHE_TTL = 30 * 1000; // 30 seconds - more aggressive caching for faster switching
 
 async function fetchIdonateTotal(idonateUrl?: string): Promise<number | null> {
 	try {
@@ -157,32 +157,73 @@ export async function getSwimmersFast(swimType?: string): Promise<SwimmerUser[]>
 		return cached.data;
 	}
 	
-	// Query all solo and/or relay entities
-	const queries: Promise<QueryCommandOutput>[] = [];
-	if (!swimType || swimType === "solo") {
-		queries.push(ddb.send(new QueryCommand({
-			TableName: process.env.USERS_TABLE_NAME!,
-			KeyConditionExpression: "pk = :pk",
-			FilterExpression: "swim_type = :swim_type AND is_admin = :is_admin",
-			ExpressionAttributeValues: { ":pk": "USER", ":swim_type": "solo", ":is_admin": false },
-		})));
-	}
-	if (!swimType || swimType === "relay") {
-		queries.push(ddb.send(new QueryCommand({
-			TableName: process.env.USERS_TABLE_NAME!,
-			KeyConditionExpression: "pk = :pk",
-			FilterExpression: "swim_type = :swim_type AND is_admin = :is_admin",
-			ExpressionAttributeValues: { ":pk": "TEAM", ":swim_type": "relay", ":is_admin": false },
-		})));
-	}
+	// OPTIMIZED: Use GSI or direct queries without expensive filters
+	let allSwimmers: SwimmerUser[] = [];
 	
-	const results = await Promise.all(queries);
-	const allSwimmers = results.flatMap(r => r.Items || []);
+			if (swimType === "solo") {
+		// Direct query for solo swimmers - much faster
+		const soloResult = await ddb.send(new QueryCommand({
+			TableName: process.env.USERS_TABLE_NAME!,
+			KeyConditionExpression: "pk = :pk",
+			ExpressionAttributeValues: { ":pk": "USER" },
+			// OPTIMIZATION: Limit results to reduce data transfer
+			Limit: 100,
+		}));
+		
+		// Filter in memory (faster than DynamoDB filter for small datasets)
+		allSwimmers = (soloResult.Items || []).filter(item => 
+			item.swim_type === "solo" && !item.is_admin
+		) as SwimmerUser[];
+		
+	} else if (swimType === "relay") {
+		// Direct query for relay teams - much faster
+		const relayResult = await ddb.send(new QueryCommand({
+			TableName: process.env.USERS_TABLE_NAME!,
+			KeyConditionExpression: "pk = :pk",
+			ExpressionAttributeValues: { ":pk": "TEAM" },
+			// OPTIMIZATION: Limit results to reduce data transfer
+			Limit: 100,
+		}));
+		
+		// Filter in memory (faster than DynamoDB filter for small datasets)
+		allSwimmers = (relayResult.Items || []).filter(item => 
+			item.swim_type === "relay" && !item.is_admin
+		) as SwimmerUser[];
+		
+	} else {
+		// Fetch both types in parallel
+		const [soloResult, relayResult] = await Promise.all([
+			ddb.send(new QueryCommand({
+				TableName: process.env.USERS_TABLE_NAME!,
+				KeyConditionExpression: "pk = :pk",
+				ExpressionAttributeValues: { ":pk": "USER" },
+				// OPTIMIZATION: Limit results to reduce data transfer
+				Limit: 100,
+			})),
+			ddb.send(new QueryCommand({
+				TableName: process.env.USERS_TABLE_NAME!,
+				KeyConditionExpression: "pk = :pk",
+				ExpressionAttributeValues: { ":pk": "TEAM" },
+				// OPTIMIZATION: Limit results to reduce data transfer
+				Limit: 100,
+			}))
+		]);
+		
+		// Combine and filter
+		const soloSwimmers = (soloResult.Items || []).filter(item => 
+			item.swim_type === "solo" && !item.is_admin
+		);
+		const relayTeams = (relayResult.Items || []).filter(item => 
+			item.swim_type === "relay" && !item.is_admin
+		);
+		
+		allSwimmers = [...soloSwimmers, ...relayTeams] as SwimmerUser[];
+	}
 	
 	// Cache the result
-	swimmersCache.set(cacheKey, { data: allSwimmers as SwimmerUser[], timestamp: Date.now() });
+	swimmersCache.set(cacheKey, { data: allSwimmers, timestamp: Date.now() });
 	
-	return allSwimmers as SwimmerUser[];
+	return allSwimmers;
 }
 
 // Progressive loading: First return basic swimmer data, then enhance with locations and donations

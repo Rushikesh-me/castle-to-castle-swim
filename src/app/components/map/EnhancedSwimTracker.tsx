@@ -256,7 +256,7 @@ export default function EnhancedSwimTracker() {
 	}, [currentSwimmerData]);
 
 	// Map center - use first track's location or fallback to solo start location
-	const fallbackCenter = tracks.length > 0 && tracks[0]?.points.length > 0 
+	const fallbackCenter = tracks.length > 0 && tracks[0]?.points && tracks[0].points.length > 0 
 		? tracks[0].points[0] 
 		: { lat: 53.541085, lng: -8.005591 }; // Solo start location
 
@@ -304,18 +304,22 @@ export default function EnhancedSwimTracker() {
 				</div>
 			</div>
 
-			{/* Loading indicator */}
+			{/* OPTIMIZED: Loading indicator - only show when actually loading */}
 			{isLoading && (
 				<div className="absolute top-20 left-1/2 transform -translate-x-1/2 z-10">
 					<div className="bg-white/90 backdrop-blur-sm rounded-lg shadow-lg border border-gray-200 px-4 py-2">
 						<div className="flex items-center">
 							<Loader2 className="w-4 h-4 mr-2 animate-spin" />
-							<span className="text-sm text-gray-600">Loading swimmers...</span>
+							<span className="text-sm text-gray-600">
+								Loading {selectedCategory === "solo" ? "swimmers" : "relay teams"}...
+							</span>
 						</div>
 					</div>
 				</div>
 			)}
-			{(!isLoading && tracks.length === 0) && (
+			
+			{/* Only show "No swimmers" when we actually have no swimmers */}
+			{(!isLoading && swimmers.length === 0) && (
 				<div className="flex h-full w-full items-center justify-center bg-background text-foreground">
 				<div className="text-center space-y-4">
 					<div>
@@ -338,9 +342,10 @@ export default function EnhancedSwimTracker() {
 				<Map
 					className="h-full w-full"
 					defaultCenter={fallbackCenter}
-					defaultZoom={14}
-					mapId={process.env.NEXT_PUBLIC_MAP_ID}
 					gestureHandling="greedy"
+					defaultZoom={16}
+					minZoom={14}
+					mapId={process.env.NEXT_PUBLIC_MAP_ID}
 					disableDefaultUI={true}
 					mapTypeControl={false}
 					streetViewControl={false}
@@ -442,6 +447,7 @@ export default function EnhancedSwimTracker() {
 					<MapBoundsUpdater 
 						swimmerHistory={swimmerHistory}
 						selectedSwimmer={selectedSwimmer}
+						tracks={tracks}
 					/>
 				</Map>
 			</APIProvider>
@@ -608,15 +614,17 @@ export default function EnhancedSwimTracker() {
 	);
 }
 
-// Component to handle map bounds updates when swimmer is selected
-function MapBoundsUpdater({ swimmerHistory, selectedSwimmer }: {
+// Component to handle map bounds updates when swimmer is selected or tracks change
+function MapBoundsUpdater({ swimmerHistory, selectedSwimmer, tracks }: {
 	swimmerHistory: LocationPoint[];
 	selectedSwimmer: DrawTrack | null;
+	tracks: DrawTrack[];
 }) {
 	const map = useMap();
 
 	useEffect(() => {
 		if (map && selectedSwimmer && swimmerHistory.length > 0) {
+			// When a swimmer is selected, fit bounds to their history
 			const bounds = new google.maps.LatLngBounds();
 			swimmerHistory.forEach((location: LocationPoint) => {
 				bounds.extend({ lat: location.lat, lng: location.lon });
@@ -625,6 +633,26 @@ function MapBoundsUpdater({ swimmerHistory, selectedSwimmer }: {
 			map.fitBounds(bounds, 100);
 		}
 	}, [map, selectedSwimmer, swimmerHistory]);
+
+	// Auto-adjust map bounds when tracks change (markers update)
+	useEffect(() => {
+		if (map && tracks.length > 0) {
+			const bounds = new google.maps.LatLngBounds();
+			
+			// Add all marker positions to bounds
+			tracks.forEach(track => {
+				if (track.current && track.current.lat && track.current.lon) {
+					bounds.extend({ lat: track.current.lat, lng: track.current.lon });
+				}
+			});
+			
+			// Only adjust bounds if we have valid coordinates
+			if (!bounds.isEmpty()) {
+				// Add padding and fit bounds to show all markers
+				map.fitBounds(bounds, 50);
+			}
+		}
+	}, [map, tracks]);
 
 	return null;
 }

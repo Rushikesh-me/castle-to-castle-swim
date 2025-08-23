@@ -8,9 +8,10 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { UpdateProfileSchema } from "@/app/utils/validation";
 import { Button } from "@/app/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/app/components/ui/card";
-import { Users, User, LogOut, Settings, Trophy, Activity, AlertCircle, CheckCircle, Upload, RefreshCw, AlertTriangle } from "lucide-react";
+import { Users, User, LogOut, Settings, Trophy, Activity, AlertCircle, CheckCircle, Upload, RefreshCw, AlertTriangle, MapPin } from "lucide-react";
 import { formatEpochString } from "@/app/utils/timeUtils";
 import { SwimmerUser } from "../types";
+import Link from "next/link";
 
 type UpdateProfileData = {
 	team_name: string;
@@ -944,6 +945,39 @@ export default function Dashboard() {
 							</CardContent>
 						</Card>
 					)}
+						{/* Admin Navigation (Admin Only) */}
+						{session.user.is_admin && (
+							<Card className="shadow-xl border-0 bg-white/80 backdrop-blur-sm">
+								<CardHeader className="pb-3">
+									<div className="flex items-center justify-between">
+										<div>
+											<h3 className="text-lg font-semibold text-gray-900">Admin Tools</h3>
+											<p className="text-sm text-gray-600">Additional administrative functions</p>
+										</div>
+									</div>
+								</CardHeader>
+								<CardContent className="p-6">
+									<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+										<Link href="/dashboard/checkloc">
+											<Button variant="outline" className="w-full h-20 flex flex-col items-center justify-center space-y-2">
+												<MapPin className="w-6 h-6" />
+												<span className="font-medium">Location Check</span>
+												<span className="text-xs text-gray-500">Monitor pre-race tracking</span>
+											</Button>
+										</Link>
+										
+										<Link href="/map">
+											<Button variant="outline" className="w-full h-20 flex flex-col items-center justify-center space-y-2">
+												<MapPin className="w-6 h-6" />
+												<span className="font-medium">Live Tracker</span>
+												<span className="text-xs text-gray-500">View real-time positions</span>
+											</Button>
+										</Link>
+									</div>
+								</CardContent>
+							</Card>
+						)}
+
 						{/* Emergencies Management (Admin Only) */}
 						{session.user.is_admin && (
 							<Card className="shadow-xl border-0 bg-white/80 backdrop-blur-sm">
