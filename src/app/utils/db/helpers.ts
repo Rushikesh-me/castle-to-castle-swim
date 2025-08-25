@@ -18,6 +18,9 @@ const SWIMMERS_CACHE_TTL = 30 * 1000; // 30 seconds - more aggressive caching fo
 const locationsCache = new Map<string, { data: SwimmerTrack[]; timestamp: number }>();
 const LOCATIONS_CACHE_TTL = 10 * 1000; // 10 seconds - very short TTL for real-time data
 
+// Timestamp filter to exclude locations after a certain point (e.g., for testing or data cutoff)
+const LOCATION_TIMESTAMP_CUTOFF = 1755962159; // Unix timestamp cutoff for location data
+
 // Function to clear locations cache (useful when switching categories)
 export function clearLocationsCache(): void {
 	locationsCache.clear();
@@ -144,17 +147,19 @@ export async function batchFetchLocations(usernames: string[], locationLimit: nu
 					Limit: locationLimit,
 				}));
 				
-				const locations = (locationResult.Items || []).map(item => ({
-					acc: item.acc || 0,
-					conn: item.conn || "unknown",
-					tst: item.tst || 0,
-					lon: item.lon || 0,
-					lat: item.lat || 0,
-					alt: item.alt || null,
-					batt: item.batt || 0,
-					pk: item.pk || username,
-					tid: item.tid || "unknown",
-				}));
+				const locations = (locationResult.Items || [])
+					.filter(item => (item.tst || 0) < LOCATION_TIMESTAMP_CUTOFF) // Filter locations before cutoff timestamp
+					.map(item => ({
+						acc: item.acc || 0,
+						conn: item.conn || "unknown",
+						tst: item.tst || 0,
+						lon: item.lon || 0,
+						lat: item.lat || 0,
+						alt: item.alt || null,
+						batt: item.batt || 0,
+						pk: item.pk || username,
+						tid: item.tid || "unknown",
+					}));
 				
 				return { username, locations };
 			} catch (error) {
@@ -641,17 +646,19 @@ export async function getSwimmerCompleteHistory(username: string) {
 			ScanIndexForward: true, // Sort ascending (oldest first for complete history)
 		}));
 
-		const locations = (locationResult.Items || []).map(item => ({
-			acc: item.acc || 0,
-			conn: item.conn || "unknown",
-			tst: item.tst || 0,
-			lon: item.lon || 0,
-			lat: item.lat || 0,
-			alt: item.alt || null,
-			batt: item.batt || 0,
-			pk: item.pk || username,
-			tid: item.tid || "unknown",
-		}));
+		const locations = (locationResult.Items || [])
+			.filter(item => (item.tst || 0) < LOCATION_TIMESTAMP_CUTOFF) // Filter locations before cutoff timestamp
+			.map(item => ({
+				acc: item.acc || 0,
+				conn: item.conn || "unknown",
+				tst: item.tst || 0,
+				lon: item.lon || 0,
+				lat: item.lat || 0,
+				alt: item.alt || null,
+				batt: item.batt || 0,
+				pk: item.pk || username,
+				tid: item.tid || "unknown",
+			}));
 
 		return locations;
 	} catch (error) {
